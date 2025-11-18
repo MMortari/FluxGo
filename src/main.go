@@ -8,6 +8,8 @@ import (
 
 type FluxGo struct {
 	Name     string
+	Version  string
+	Env      string
 	Debugger bool
 
 	dependencies []fx.Option
@@ -16,7 +18,7 @@ type FluxGo struct {
 
 func New(config FluxGo) *FluxGo {
 	init := config
-	init.dependencies = []fx.Option{fx.NopLogger}
+	init.dependencies = []fx.Option{}
 
 	return &init
 }

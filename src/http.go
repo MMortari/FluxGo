@@ -14,6 +14,8 @@ import (
 type HttpOptions struct {
 	Port      int
 	ConfigApp []func(*fiber.App)
+
+	UseApmOnFiber bool
 }
 
 func (f *FluxGo) AddHttp(opt HttpOptions) *FluxGo {
@@ -27,21 +29,19 @@ func (f *FluxGo) AddHttp(opt HttpOptions) *FluxGo {
 		fn(app)
 	}
 
-	f.AddDependency(fx.Provide(func() *fiber.App {
-		return app
-	}))
-	f.AddInvoke(fx.Invoke(func(lc fx.Lifecycle) error {
+	f.AddDependency(fx.Provide(getProvideFunction(opt, app)))
+	f.AddInvoke(fx.Invoke(func(lc fx.Lifecycle, appI *fiber.App) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				go func() {
-					if err := app.Listen(fmt.Sprintf(":%d", opt.Port)); err != nil {
+					if err := appI.Listen(fmt.Sprintf(":%d", opt.Port)); err != nil {
 						log.Panic(err)
 					}
 				}()
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				return app.Shutdown()
+				return appI.Shutdown()
 			},
 		})
 
@@ -49,6 +49,19 @@ func (f *FluxGo) AddHttp(opt HttpOptions) *FluxGo {
 	}))
 
 	return f
+}
+
+func getProvideFunction(opt HttpOptions, app *fiber.App) interface{} {
+	if opt.UseApmOnFiber {
+		return func(apm *TApm) *fiber.App {
+			app.Use(apm.SetFiberMiddleware())
+			return app
+		}
+	}
+
+	return func() *fiber.App {
+		return app
+	}
 }
 
 func httpStart(lc fx.Lifecycle, app *fiber.App) error {
