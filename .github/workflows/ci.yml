@@ -1,0 +1,37 @@
+name: CI
+
+on:
+  workflow_call:
+  push:
+    branches:
+      - "feature/*"
+      - "feat/*"
+      - "fix/*"
+      - "bugfix/*"
+      - "hotfix/*"
+      - "refact/*"
+      - "refactor/*"
+
+permissions:
+  contents: read
+
+jobs:
+  CI:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Running lint
+        uses: golangci/golangci-lint-action@v8
+        timeout-minutes: 5
+        with:
+          version: v2.4
+          skip-cache: false
+
+      - name: E2E Test
+        run: |
+          go test ./... -cover
