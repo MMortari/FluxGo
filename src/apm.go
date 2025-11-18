@@ -28,7 +28,7 @@ type ApmOptions struct {
 }
 
 func (f *FluxGo) AddApm(opt ApmOptions) *FluxGo {
-	f.AddDependency(fx.Provide(func(lc fx.Lifecycle) *TApm {
+	f.AddDependency(fx.Provide(func() *TApm {
 		tp, tracer := configApm(configApmI{
 			ApmOptions:     opt,
 			ServiceName:    f.Name,
@@ -41,14 +41,16 @@ func (f *FluxGo) AddApm(opt ApmOptions) *FluxGo {
 			Tracer:        tracer,
 			CollectorURL:  opt.CollectorURL,
 		}
-
+		return &apm
+	}))
+	f.AddInvoke(fx.Invoke(func(lc fx.Lifecycle, apm *TApm) error {
 		lc.Append(fx.Hook{
 			OnStop: func(ctx context.Context) error {
-				return tp.Shutdown(context.Background())
+				return apm.TraceProvider.Shutdown(context.Background())
 			},
 		})
 
-		return &apm
+		return nil
 	}))
 
 	return f
@@ -85,18 +87,13 @@ type configApmI struct {
 }
 
 func configApm(config configApmI) (*sdktrace.TracerProvider, *Tracer) {
-	if config.Env == "test" {
-		return nil, nil
-	}
-
 	exporter, err := getExporter(config)
-
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	if exporter == nil {
-		log.Println("No exporter provided")
+		log.Fatal("No exporter provided")
 		return nil, nil
 	}
 
@@ -172,5 +169,5 @@ func getExporter(config configApmI) (sdktrace.SpanExporter, error) {
 		return stdouttrace.New()
 	}
 
-	return nil, nil
+	panic("Invalid APM exporter type")
 }

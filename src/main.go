@@ -12,6 +12,9 @@ type FluxGo struct {
 	Env      string
 	Debugger bool
 
+	Logger *LoggerInstance
+	Apm    *TApm
+
 	dependencies []fx.Option
 	invokes      []fx.Option
 }
@@ -19,6 +22,8 @@ type FluxGo struct {
 func New(config FluxGo) *FluxGo {
 	init := config
 	init.dependencies = []fx.Option{}
+
+	init.ConfigLogger(LoggerOptions{Type: "console"})
 
 	return &init
 }
