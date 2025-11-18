@@ -28,19 +28,20 @@ type ApmOptions struct {
 }
 
 func (f *FluxGo) AddApm(opt ApmOptions) *FluxGo {
-	f.AddDependency(fx.Provide(func() *TApm {
-		tp, tracer := configApm(configApmI{
-			ApmOptions:     opt,
-			ServiceName:    f.Name,
-			ServiceVersion: f.Version,
-			Env:            f.Env,
-		})
+	tp, tracer := configApm(configApmI{
+		ApmOptions:     opt,
+		ServiceName:    f.Name,
+		ServiceVersion: f.Version,
+		Env:            f.Env,
+	})
 
-		apm := TApm{
-			TraceProvider: tp,
-			Tracer:        tracer,
-			CollectorURL:  opt.CollectorURL,
-		}
+	apm := TApm{
+		TraceProvider: tp,
+		Tracer:        tracer,
+		CollectorURL:  opt.CollectorURL,
+	}
+
+	f.AddDependency(fx.Provide(func() *TApm {
 		return &apm
 	}))
 	f.AddInvoke(fx.Invoke(func(lc fx.Lifecycle, apm *TApm) error {
@@ -52,6 +53,8 @@ func (f *FluxGo) AddApm(opt ApmOptions) *FluxGo {
 
 		return nil
 	}))
+
+	f.Apm = &apm
 
 	return f
 }
