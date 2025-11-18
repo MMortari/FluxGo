@@ -17,9 +17,11 @@ type FluxGo struct {
 
 	logger *LoggerInstance
 	apm    *TApm
+	http   *Http
 
 	dependencies []fx.Option
 	invokes      []fx.Option
+	modules      []*FluxModule
 }
 
 func New(config FluxGo) *FluxGo {
@@ -43,8 +45,23 @@ func (f *FluxGo) AddInvoke(opt fx.Option) *FluxGo {
 
 	return f
 }
+
+func (f *FluxGo) CreateModule(name string) *FluxModule {
+	mod := Module(name, f)
+	f.modules = append(f.modules, mod)
+	f.log("MODULE/ADD", mod.Name)
+
+	return mod
+}
 func (f *FluxGo) GetFxConfig() []fx.Option {
-	return append(f.dependencies, f.invokes...)
+	full := append(f.dependencies, f.invokes...)
+	modules := []fx.Option{}
+	for _, module := range f.modules {
+		modules = append(modules, module.toFx())
+	}
+	full = append(full, modules...)
+
+	return full
 }
 
 func (f *FluxGo) Run() {
