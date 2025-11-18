@@ -9,15 +9,20 @@ import (
 )
 
 type FluxModule struct {
-	Flux *FluxGo
 	Name string
 
 	dependencies []fx.Option
 	invokes      []fx.Option
 }
 
-func Module(name string, Flux *FluxGo) *FluxModule {
-	return &FluxModule{Name: name, Flux: Flux}
+func Module(name string) *FluxModule {
+	return &FluxModule{Name: name}
+}
+
+func (f *FluxModule) toFx() fx.Option {
+	full := append(f.dependencies, f.invokes...)
+
+	return fx.Module(f.Name, full...)
 }
 
 type RouteIncome struct {
@@ -33,20 +38,26 @@ type EntityData any
 type RouteHandler func(ctx context.Context, c *fiber.Ctx, income EntityData) error
 
 func (f *FluxModule) HttpRoute(group string, method string, path string, config RouteIncome, handler RouteHandler) *FluxModule {
-	router := f.Flux.http.GetRouter(group)
+	f.invokes = append(f.invokes, fx.Invoke(func(http *Http) {
+		router := http.GetRouter(group)
 
-	router.Add(method, path, func(c *fiber.Ctx) error {
-		data, err := config.Parse(f, c)
-		if err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(err)
-		}
-		return handler(c.UserContext(), c, data)
-	})
+		router.Add(method, path, func(c *fiber.Ctx) error {
+			data, err := config.Parse(http, c)
+			if err != nil {
+				return c.Status(fiber.StatusBadRequest).JSON(err)
+			}
+			return handler(c.UserContext(), c, data)
+		})
+	}))
 
 	return f
 }
 
-func (i *RouteIncome) Parse(f *FluxModule, c *fiber.Ctx) (EntityData, *GlobalError) {
+func (i *RouteIncome) Parse(http *Http, c *fiber.Ctx) (EntityData, *GlobalError) {
+	if i.Entity == nil {
+		return nil, nil
+	}
+
 	ptr := reflect.New(reflect.TypeOf(i.Entity))
 	data := ptr.Interface()
 
@@ -91,15 +102,9 @@ func (i *RouteIncome) Parse(f *FluxModule, c *fiber.Ctx) (EntityData, *GlobalErr
 		}
 	}
 	if i.Validate {
-		if hasErrors, erros := f.Flux.GetHttp().GetValidator().Run(data); hasErrors {
+		if hasErrors, erros := http.GetValidator().Run(data); hasErrors {
 			return nil, erros
 		}
 	}
 	return data, nil
-}
-
-func (f *FluxModule) toFx() fx.Option {
-	full := append(f.dependencies, f.invokes...)
-
-	return fx.Module(f.Name, full...)
 }

@@ -46,13 +46,11 @@ func (f *FluxGo) AddInvoke(opt fx.Option) *FluxGo {
 	return f
 }
 
-func (f *FluxGo) CreateModule(name string) *FluxModule {
-	mod := Module(name, f)
+func (f *FluxGo) AddModule(mod *FluxModule) {
 	f.modules = append(f.modules, mod)
 	f.log("MODULE/ADD", mod.Name)
-
-	return mod
 }
+
 func (f *FluxGo) GetFxConfig() []fx.Option {
 	full := append(f.dependencies, f.invokes...)
 	modules := []fx.Option{}

@@ -9,6 +9,7 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
+	"github.com/gofiber/fiber/v2/middleware/logger"
 	"go.uber.org/fx"
 )
 
@@ -43,8 +44,9 @@ type Http struct {
 }
 
 type HttpOptions struct {
-	Port      int
-	ConfigApp []func(*fiber.App)
+	Port       int
+	ConfigApp  []func(*fiber.App)
+	LogRequest bool
 
 	FiberConfig fiber.Config
 }
@@ -53,6 +55,12 @@ func NewHttp(opt HttpOptions) *Http {
 	app := fiber.New(opt.FiberConfig)
 	app.Use(helmet.New())
 	app.Use(cors.New())
+
+	if opt.LogRequest {
+		app.Use(logger.New(logger.Config{
+			Format: "${time} ${status} - ${method} ${path} ${latency}\n",
+		}))
+	}
 
 	for _, fn := range opt.ConfigApp {
 		fn(app)
