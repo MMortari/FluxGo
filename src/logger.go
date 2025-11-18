@@ -44,7 +44,8 @@ func handleLogLevel(log *logrus.Logger, opt LoggerOptions) {
 	log.SetLevel(level)
 }
 func handleLogType(log *logrus.Logger, opt LoggerOptions) {
-	if opt.Type == "file" {
+	switch opt.Type {
+	case "file":
 		if opt.LogFilePath == "" {
 			panic("Log file path is required for file logger type")
 		}
@@ -63,9 +64,11 @@ func handleLogType(log *logrus.Logger, opt LoggerOptions) {
 				logrus.FieldKeyFunc:  "function.name",
 			},
 		})
-	} else if opt.Type == "console" {
+
+	case "console":
 		log.SetOutput(os.Stdout)
-	} else {
+
+	default:
 		panic("Invalid logger type")
 	}
 }

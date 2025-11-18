@@ -63,23 +63,3 @@ func getProvideFunction(opt HttpOptions, app *fiber.App) interface{} {
 		return app
 	}
 }
-
-func httpStart(lc fx.Lifecycle, app *fiber.App) error {
-	port := 3333
-
-	lc.Append(fx.Hook{
-		OnStart: func(ctx context.Context) error {
-			go func() {
-				if err := app.Listen(fmt.Sprintf(":%d", port)); err != nil {
-					log.Panic(err)
-				}
-			}()
-			return nil
-		},
-		OnStop: func(ctx context.Context) error {
-			return app.Shutdown()
-		},
-	})
-
-	return nil
-}
