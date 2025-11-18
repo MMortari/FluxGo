@@ -27,7 +27,7 @@ func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
 		"service.version": f.Version,
 	})
 
-	f.Logger = logrus.NewEntry(log)
+	f.logger = logrus.NewEntry(log)
 
 	return f
 }
@@ -76,8 +76,8 @@ func handleLogType(log *logrus.Logger, opt LoggerOptions) {
 func (f *FluxGo) CreateLogger(c context.Context) *LoggerInstance {
 	spanFields := logrus.Fields{}
 
-	if f.Apm != nil {
-		span := f.Apm.GetSpanFromContext(c)
+	if f.apm != nil {
+		span := f.apm.GetSpanFromContext(c)
 
 		if span.SpanContext().HasTraceID() {
 			spanFields["trace.id"] = span.SpanContext().TraceID().String()
@@ -87,8 +87,8 @@ func (f *FluxGo) CreateLogger(c context.Context) *LoggerInstance {
 			spanFields["span.id"] = span.SpanContext().SpanID().String()
 		}
 
-		return f.Logger.WithFields(spanFields)
+		return f.logger.WithFields(spanFields)
 	}
 
-	return f.Logger
+	return f.logger
 }

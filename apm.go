@@ -54,7 +54,7 @@ func (f *FluxGo) AddApm(opt ApmOptions) *FluxGo {
 		return nil
 	}))
 
-	f.Apm = &apm
+	f.apm = &apm
 
 	return f
 }

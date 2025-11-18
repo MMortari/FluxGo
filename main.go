@@ -2,8 +2,11 @@ package fluxgo
 
 import (
 	"fmt"
+	"testing"
 
+	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
+	"go.uber.org/fx/fxtest"
 )
 
 type FluxGo struct {
@@ -12,8 +15,8 @@ type FluxGo struct {
 	Env      string
 	Debugger bool
 
-	Logger *LoggerInstance
-	Apm    *TApm
+	logger *LoggerInstance
+	apm    *TApm
 
 	dependencies []fx.Option
 	invokes      []fx.Option
@@ -46,6 +49,18 @@ func (f *FluxGo) GetFxConfig() []fx.Option {
 
 func (f *FluxGo) Run() {
 	fx.New(f.GetFxConfig()...).Run()
+}
+
+func (f *FluxGo) GetTestApp(t *testing.T) (*fxtest.App, *fiber.App) {
+	var app *fiber.App
+
+	opts := append(f.GetFxConfig(), fx.Invoke(func(a *fiber.App) {
+		app = a
+	}), fx.NopLogger)
+
+	fxApp := fxtest.New(t, opts...)
+
+	return fxApp, app
 }
 
 func (f *FluxGo) log(key, message string) {
