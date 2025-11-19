@@ -1,7 +1,6 @@
 package fluxgo
 
 import (
-	"context"
 	"reflect"
 
 	"github.com/gofiber/fiber/v2"
@@ -25,6 +24,12 @@ func (f *FluxModule) toFx() fx.Option {
 	return fx.Module(f.Name, full...)
 }
 
+func (f *FluxModule) AddHandler(constructors ...interface{}) *FluxModule {
+	f.dependencies = append(f.dependencies, fx.Provide(constructors...))
+
+	return f
+}
+
 type RouteIncome struct {
 	Entity     EntityData
 	FromBody   bool
@@ -35,22 +40,38 @@ type RouteIncome struct {
 }
 type EntityData any
 
-type RouteHandler func(ctx context.Context, c *fiber.Ctx, income EntityData) error
+type RouteHandler func(c *fiber.Ctx, income interface{}) (*GlobalResponse[interface{}], *GlobalError)
 
-func (f *FluxModule) HttpRoute(group string, method string, path string, config RouteIncome, handler RouteHandler) *FluxModule {
-	f.invokes = append(f.invokes, fx.Invoke(func(http *Http) {
-		router := http.GetRouter(group)
+type RouteFn interface{}
 
-		router.Add(method, path, func(c *fiber.Ctx) error {
-			data, err := config.Parse(http, c)
-			if err != nil {
-				return c.Status(fiber.StatusBadRequest).JSON(err)
-			}
-			return handler(c.UserContext(), c, data)
-		})
-	}))
+func (f *FluxModule) AddRoute(fn RouteFn) *FluxModule {
+	f.invokes = append(f.invokes, fx.Invoke(fn))
 
 	return f
+}
+func (m *FluxModule) HttpRoute(f *FluxGo, group string, method string, path string, config RouteIncome, handler RouteHandler) error {
+	http := f.GetHttp()
+	r := http.GetRouter(group)
+
+	r.Add(method, path, func(c *fiber.Ctx) error {
+		income, err := config.Parse(http, c)
+		if err != nil {
+			return c.Status(err.Status).JSON(err)
+		}
+
+		res, gErr := handler(c, income)
+		if gErr != nil {
+			return c.Status(gErr.Status).JSON(gErr)
+		}
+
+		if res != nil {
+			return c.Status(res.Status).JSON(res.Content)
+		}
+
+		return nil
+	})
+
+	return nil
 }
 
 func (i *RouteIncome) Parse(http *Http, c *fiber.Ctx) (EntityData, *GlobalError) {

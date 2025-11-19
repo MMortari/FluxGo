@@ -52,6 +52,10 @@ func (f *FluxGo) AddModule(mod *FluxModule) {
 }
 
 func (f *FluxGo) GetFxConfig() []fx.Option {
+	f.dependencies = append(f.dependencies, fx.Provide(func() *FluxGo {
+		return f
+	}))
+
 	full := append(f.dependencies, f.invokes...)
 	modules := []fx.Option{}
 	for _, module := range f.modules {

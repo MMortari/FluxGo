@@ -160,6 +160,10 @@ type errorResponse struct {
 	Value       interface{} `json:"value"`
 }
 
+type GlobalResponse[T any] struct {
+	Status  int
+	Content T
+}
 type GlobalError struct {
 	Message     string `json:"message,omitempty"`
 	Code        string `json:"code"`
