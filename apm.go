@@ -41,10 +41,10 @@ func (f *FluxGo) AddApm(opt ApmOptions) *FluxGo {
 		CollectorURL:  opt.CollectorURL,
 	}
 
-	f.AddDependency(fx.Provide(func() *TApm {
+	f.AddDependency(func() *TApm {
 		return &apm
-	}))
-	f.AddInvoke(fx.Invoke(func(lc fx.Lifecycle, apm *TApm) error {
+	})
+	f.AddInvoke(func(lc fx.Lifecycle, apm *TApm) error {
 		lc.Append(fx.Hook{
 			OnStop: func(ctx context.Context) error {
 				return apm.TraceProvider.Shutdown(context.Background())
@@ -52,7 +52,7 @@ func (f *FluxGo) AddApm(opt ApmOptions) *FluxGo {
 		})
 
 		return nil
-	}))
+	})
 
 	f.apm = &apm
 

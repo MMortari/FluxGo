@@ -33,13 +33,15 @@ func New(config FluxGo) *FluxGo {
 	return &init
 }
 
-func (f *FluxGo) AddDependency(opt fx.Option) *FluxGo {
+func (f *FluxGo) AddDependency(constructors ...interface{}) *FluxGo {
+	opt := fx.Provide(constructors...)
 	f.dependencies = append(f.dependencies, opt)
 	f.log("DEPENDENCY/ADD", opt.String())
 
 	return f
 }
-func (f *FluxGo) AddInvoke(opt fx.Option) *FluxGo {
+func (f *FluxGo) AddInvoke(constructors ...interface{}) *FluxGo {
+	opt := fx.Invoke(constructors...)
 	f.invokes = append(f.invokes, opt)
 	f.log("INVOKE/ADD", opt.String())
 

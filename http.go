@@ -15,14 +15,14 @@ import (
 
 func (f *FluxGo) AddHttp(http *Http) *FluxGo {
 	f.AddDependency(http.Provider(f.apm != nil))
-	f.AddInvoke(fx.Invoke(func(lc fx.Lifecycle) error {
+	f.AddInvoke(func(lc fx.Lifecycle) error {
 		lc.Append(fx.Hook{
 			OnStart: http.Start,
 			OnStop:  http.Stop,
 		})
 
 		return nil
-	}))
+	})
 
 	f.http = http
 
@@ -84,17 +84,17 @@ func (h *Http) Start(ctx context.Context) error {
 func (h *Http) Stop(ctx context.Context) error {
 	return h.app.Shutdown()
 }
-func (h *Http) Provider(hasApm bool) fx.Option {
+func (h *Http) Provider(hasApm bool) interface{} {
 	if hasApm {
-		return fx.Provide(func(apm *TApm) *Http {
+		return func(apm *TApm) *Http {
 			h.GetApp().Use(apm.SetFiberMiddleware())
 			return h
-		})
+		}
 	}
 
-	return fx.Provide(func() *Http {
+	return func() *Http {
 		return h
-	})
+	}
 }
 
 func (h *Http) GetApp() *fiber.App {
