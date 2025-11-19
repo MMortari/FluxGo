@@ -6,6 +6,8 @@ require (
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/gofiber/contrib/otelfiber/v2 v2.2.3
 	github.com/gofiber/fiber/v2 v2.52.9
+	github.com/jmoiron/sqlx v1.4.0
+	github.com/lib/pq v1.10.9
 	github.com/redis/go-redis/v9 v9.16.0
 	github.com/sirupsen/logrus v1.9.3
 	go.opentelemetry.io/otel v1.38.0
