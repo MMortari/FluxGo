@@ -7,6 +7,9 @@ import (
 	"go.uber.org/fx"
 )
 
+type Redis struct {
+	client *redis.Client
+}
 type RedisOptions struct {
 	redis.Options
 }
@@ -14,7 +17,10 @@ type RedisOptions struct {
 func (f *FluxGo) AddRedis(opt RedisOptions) *FluxGo {
 	client := redis.NewClient(&opt.Options)
 
-	f.AddInvoke(fx.Invoke(func(lc fx.Lifecycle) error {
+	f.AddDependency(func() *Redis {
+		return &Redis{client: client}
+	})
+	f.AddInvoke(func(lc fx.Lifecycle) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				return redisConnect(client)
@@ -25,7 +31,7 @@ func (f *FluxGo) AddRedis(opt RedisOptions) *FluxGo {
 		})
 
 		return nil
-	}))
+	})
 
 	return f
 }
