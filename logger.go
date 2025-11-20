@@ -7,7 +7,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type LoggerInstance = logrus.Entry
+type Logger = logrus.Entry
 
 type LoggerOptions struct {
 	Type        string
@@ -73,7 +73,7 @@ func handleLogType(log *logrus.Logger, opt LoggerOptions) {
 	}
 }
 
-func (f *FluxGo) CreateLogger(c context.Context) *LoggerInstance {
+func (f *FluxGo) CreateLogger(c context.Context) *Logger {
 	spanFields := logrus.Fields{}
 
 	if f.apm != nil {

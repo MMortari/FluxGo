@@ -49,14 +49,25 @@ func (f *FluxGo) AddApm(opt ApmOptions) *FluxGo {
 
 	f.apm = &apm
 
-	f.AddDependency(func(lc fx.Lifecycle) *Apm {
+	f.AddDependency(func() *Apm {
+		return &apm
+	})
+	f.AddInvoke(func(lc fx.Lifecycle, apm *Apm) error {
 		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				f.log("APM", "Started")
+				return nil
+			},
 			OnStop: func(ctx context.Context) error {
-				return apm.TraceProvider.Shutdown(ctx)
+				err := apm.TraceProvider.Shutdown(ctx)
+				if err != nil {
+					return err
+				}
+				f.log("APM", "Stopped")
+				return nil
 			},
 		})
-
-		return &apm
+		return nil
 	})
 
 	return f

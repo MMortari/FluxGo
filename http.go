@@ -20,8 +20,24 @@ func (f *FluxGo) AddHttp(http *Http) *FluxGo {
 	})
 	f.AddInvoke(func(lc fx.Lifecycle) error {
 		lc.Append(fx.Hook{
-			OnStart: http.Start,
-			OnStop:  http.Stop,
+			OnStart: func(ctx context.Context) error {
+				err := http.Start(ctx)
+				if err != nil {
+					return err
+				}
+				f.log("HTTP", fmt.Sprintf("Running on port %d", http.port))
+
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				err := http.Stop(ctx)
+				if err != nil {
+					return err
+				}
+				f.log("HTTP", "Stopped")
+
+				return nil
+			},
 		})
 
 		return nil
@@ -56,6 +72,7 @@ type HttpOptions struct {
 }
 
 func NewHttp(opt HttpOptions) *Http {
+	opt.FiberConfig.DisableStartupMessage = true
 	app := fiber.New(opt.FiberConfig)
 
 	if opt.Apm != nil {

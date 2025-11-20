@@ -22,9 +22,9 @@ type DatabaseOptions struct {
 
 func (f *FluxGo) AddDatabase(opt DatabaseOptions) *FluxGo {
 	f.AddDependency(func(apm *Apm) *Database {
-		db, err := sqlx.Connect("postgres", opt.Dsn)
+		db, err := sqlx.Open("postgres", opt.Dsn)
 		if err != nil {
-			log.Fatalln("Error to connect on database", err)
+			log.Fatalln("Error to create database client", err)
 		}
 
 		database := Database{db, apm}
@@ -34,10 +34,20 @@ func (f *FluxGo) AddDatabase(opt DatabaseOptions) *FluxGo {
 	f.AddInvoke(func(lc fx.Lifecycle, db *Database) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				return db.Ping()
+				err := db.Ping()
+				if err != nil {
+					return err
+				}
+				f.log("DATABASE", "Connected")
+				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				return db.Close()
+				err := db.Close()
+				if err != nil {
+					return err
+				}
+				f.log("DATABASE", "Disconnected")
+				return nil
 			},
 		})
 		return nil

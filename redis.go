@@ -21,10 +21,20 @@ func (f *FluxGo) AddRedis(opt RedisOptions) *FluxGo {
 	f.AddInvoke(func(lc fx.Lifecycle, redis *Redis) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				return redis.connect(ctx)
+				err := redis.connect(ctx)
+				if err != nil {
+					return err
+				}
+				f.log("REDIS", "Connected")
+				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				return redis.disconnect()
+				err := redis.disconnect()
+				if err != nil {
+					return err
+				}
+				f.log("REDIS", "Disconnected")
+				return nil
 			},
 		})
 

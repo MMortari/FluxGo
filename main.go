@@ -15,7 +15,7 @@ type FluxGo struct {
 	Env      string
 	Debugger bool
 
-	logger *LoggerInstance
+	logger *Logger
 	apm    *Apm
 	http   *Http
 
@@ -36,21 +36,20 @@ func New(config FluxGo) *FluxGo {
 func (f *FluxGo) AddDependency(constructors ...interface{}) *FluxGo {
 	opt := fx.Provide(constructors...)
 	f.dependencies = append(f.dependencies, opt)
-	f.log("DEPENDENCY/ADD", opt.String())
 
 	return f
 }
 func (f *FluxGo) AddInvoke(constructors ...interface{}) *FluxGo {
 	opt := fx.Invoke(constructors...)
 	f.invokes = append(f.invokes, opt)
-	f.log("INVOKE/ADD", opt.String())
 
 	return f
 }
 
-func (f *FluxGo) AddModule(mod *FluxModule) {
+func (f *FluxGo) AddModule(mod *FluxModule) *FluxGo {
 	f.modules = append(f.modules, mod)
-	f.log("MODULE/ADD", mod.Name)
+
+	return f
 }
 
 func (f *FluxGo) GetFxConfig() []fx.Option {
