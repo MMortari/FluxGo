@@ -62,6 +62,9 @@ func (f *FluxGo) AddApm(opt ApmOptions) *FluxGo {
 	return f
 }
 func (f *FluxGo) GetApm() *Apm {
+	if f.apm == nil {
+		log.Fatal("APM not initialized. Please call AddApm() before using GetApm().")
+	}
 	return f.apm
 }
 

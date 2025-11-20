@@ -21,7 +21,7 @@ type DatabaseOptions struct {
 }
 
 func (f *FluxGo) AddDatabase(opt DatabaseOptions) *FluxGo {
-	f.AddDependency(func(lc fx.Lifecycle, apm *Apm) *Database {
+	f.AddDependency(func(apm *Apm) *Database {
 		db, err := sqlx.Connect("postgres", opt.Dsn)
 		if err != nil {
 			log.Fatalln("Error to connect on database", err)
@@ -29,6 +29,9 @@ func (f *FluxGo) AddDatabase(opt DatabaseOptions) *FluxGo {
 
 		database := Database{db, apm}
 
+		return &database
+	})
+	f.AddInvoke(func(lc fx.Lifecycle, db *Database) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				return db.Ping()
@@ -37,15 +40,14 @@ func (f *FluxGo) AddDatabase(opt DatabaseOptions) *FluxGo {
 				return db.Close()
 			},
 		})
-
-		return &database
+		return nil
 	})
 
 	return f
 }
 
-func (d *Database) StartSpan(ctx context.Context, tableName string, opts ...trace.SpanStartOption) (context.Context, Span) {
-	return d.apm.StartSpan(ctx, fmt.Sprintf("repository/%s/%s", tableName, FunctionCaller(2)), opts...)
+func (d *Database) StartSpan(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, Span) {
+	return d.apm.StartSpan(ctx, name, opts...)
 }
 
 type Entity interface {
@@ -71,5 +73,5 @@ func NewRepository[T Entity](db *Database, tableName string) *Repository[T] {
 
 func (o *Repository[T]) StartSpan(ctx context.Context, opts ...trace.SpanStartOption) (context.Context, Span) {
 	opts = append(opts, trace.WithAttributes(attribute.String("db.system", "postgresql")))
-	return o.DB.StartSpan(ctx, o.tableName, opts...)
+	return o.DB.StartSpan(ctx, fmt.Sprintf("repository/%s/%s", o.tableName, FunctionCaller(2)), opts...)
 }

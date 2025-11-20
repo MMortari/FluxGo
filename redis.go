@@ -15,18 +15,16 @@ type RedisOptions struct {
 }
 
 func (f *FluxGo) AddRedis(opt RedisOptions) *FluxGo {
-	client := redis.NewClient(&opt.Options)
-
 	f.AddDependency(func() *Redis {
-		return &Redis{client: client}
+		return &Redis{client: redis.NewClient(&opt.Options)}
 	})
-	f.AddInvoke(func(lc fx.Lifecycle) error {
+	f.AddInvoke(func(lc fx.Lifecycle, redis *Redis) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				return redisConnect(client)
+				return redis.connect(ctx)
 			},
 			OnStop: func(ctx context.Context) error {
-				return redisDisconnect(client)
+				return redis.disconnect()
 			},
 		})
 
@@ -35,17 +33,15 @@ func (f *FluxGo) AddRedis(opt RedisOptions) *FluxGo {
 
 	return f
 }
-func redisConnect(client *redis.Client) error {
-	if err := client.Ping(context.Background()).Err(); err != nil {
+func (r *Redis) connect(ctx context.Context) error {
+	if err := r.client.Ping(context.Background()).Err(); err != nil {
 		return err
 	}
 
 	return nil
 }
-func redisDisconnect(client *redis.Client) error {
-	err := client.Close()
-
-	if err != nil {
+func (r *Redis) disconnect() error {
+	if err := r.client.Close(); err != nil {
 		return err
 	}
 

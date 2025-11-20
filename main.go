@@ -64,6 +64,7 @@ func (f *FluxGo) GetFxConfig() []fx.Option {
 		modules = append(modules, module.toFx())
 	}
 	full = append(full, modules...)
+	full = append(full, fx.NopLogger)
 
 	return full
 }
