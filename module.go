@@ -1,6 +1,7 @@
 package fluxgo
 
 import (
+	"context"
 	"reflect"
 
 	"github.com/gofiber/fiber/v2"
@@ -40,7 +41,8 @@ type RouteIncome struct {
 }
 type EntityData any
 
-type RouteHandler func(c *fiber.Ctx, income interface{}) (*GlobalResponse, *GlobalError)
+type HttpHandler func(c *fiber.Ctx, income interface{}) (*GlobalResponse, *GlobalError)
+type CronHandler func(ctx context.Context) error
 
 type RouteFn interface{}
 
@@ -49,7 +51,7 @@ func (f *FluxModule) AddRoute(fn RouteFn) *FluxModule {
 
 	return f
 }
-func (m *FluxModule) HttpRoute(f *FluxGo, group string, method string, path string, config RouteIncome, handler RouteHandler) error {
+func (m *FluxModule) HttpRoute(f *FluxGo, group string, method string, path string, config RouteIncome, handler HttpHandler) error {
 	http := f.GetHttp()
 	r := http.GetRouter(group)
 
@@ -72,6 +74,9 @@ func (m *FluxModule) HttpRoute(f *FluxGo, group string, method string, path stri
 	})
 
 	return nil
+}
+func (m *FluxModule) CronRoute(cron *Cron, crontab string, handler CronHandler) error {
+	return cron.Register(crontab, handler)
 }
 
 func (i *RouteIncome) Parse(http *Http, c *fiber.Ctx) (EntityData, *GlobalError) {
