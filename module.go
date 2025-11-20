@@ -40,7 +40,7 @@ type RouteIncome struct {
 }
 type EntityData any
 
-type RouteHandler func(c *fiber.Ctx, income interface{}) (*GlobalResponse[interface{}], *GlobalError)
+type RouteHandler func(c *fiber.Ctx, income interface{}) (*GlobalResponse, *GlobalError)
 
 type RouteFn interface{}
 

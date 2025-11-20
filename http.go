@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
@@ -86,7 +87,7 @@ func (h *Http) Stop(ctx context.Context) error {
 }
 func (h *Http) Provider(hasApm bool) interface{} {
 	if hasApm {
-		return func(apm *TApm) *Http {
+		return func(apm *Apm) *Http {
 			h.GetApp().Use(apm.SetFiberMiddleware())
 			return h
 		}
@@ -160,9 +161,9 @@ type errorResponse struct {
 	Value       interface{} `json:"value"`
 }
 
-type GlobalResponse[T any] struct {
+type GlobalResponse struct {
 	Status  int
-	Content T
+	Content interface{}
 }
 type GlobalError struct {
 	Message     string `json:"message,omitempty"`
@@ -171,4 +172,21 @@ type GlobalError struct {
 	Success     bool   `json:"success"`
 	Errors      any    `json:"errors,omitempty"`
 	UserMessage string `json:"user_message,omitempty"`
+}
+
+func ErrorInternalError(message string) *GlobalError {
+	return &GlobalError{
+		Message: message,
+		Code:    "internal_error",
+		Status:  http.StatusInternalServerError,
+		Success: false,
+	}
+}
+func ErrorNotFound(message string) *GlobalError {
+	return &GlobalError{
+		Message: message,
+		Code:    "not_found",
+		Status:  http.StatusNotFound,
+		Success: false,
+	}
 }

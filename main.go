@@ -16,7 +16,7 @@ type FluxGo struct {
 	Debugger bool
 
 	logger *LoggerInstance
-	apm    *TApm
+	apm    *Apm
 	http   *Http
 
 	dependencies []fx.Option

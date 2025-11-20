@@ -2,28 +2,32 @@ package fluxgo
 
 import (
 	"context"
+	"fmt"
 	"log"
 
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 )
 
 type Database struct {
 	*sqlx.DB
+	apm *Apm
 }
 type DatabaseOptions struct {
 	Dsn string
 }
 
 func (f *FluxGo) AddDatabase(opt DatabaseOptions) *FluxGo {
-	f.AddDependency(func(lc fx.Lifecycle) *Database {
+	f.AddDependency(func(lc fx.Lifecycle, apm *Apm) *Database {
 		db, err := sqlx.Connect("postgres", opt.Dsn)
 		if err != nil {
 			log.Fatalln("Error to connect on database", err)
 		}
 
-		database := Database{db}
+		database := Database{db, apm}
 
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
@@ -38,4 +42,34 @@ func (f *FluxGo) AddDatabase(opt DatabaseOptions) *FluxGo {
 	})
 
 	return f
+}
+
+func (d *Database) StartSpan(ctx context.Context, tableName string, opts ...trace.SpanStartOption) (context.Context, Span) {
+	return d.apm.StartSpan(ctx, fmt.Sprintf("repository/%s/%s", tableName, FunctionCaller(2)), opts...)
+}
+
+type Entity interface {
+	TableName() string
+	PrimaryKey() string
+}
+
+type Repository[T Entity] struct {
+	DB         *Database
+	tableName  string
+	primaryKey string
+}
+
+func NewRepository[T Entity](db *Database, tableName string) *Repository[T] {
+	var entity T
+
+	return &Repository[T]{
+		DB:         db,
+		tableName:  entity.TableName(),
+		primaryKey: entity.PrimaryKey(),
+	}
+}
+
+func (o *Repository[T]) StartSpan(ctx context.Context, opts ...trace.SpanStartOption) (context.Context, Span) {
+	opts = append(opts, trace.WithAttributes(attribute.String("db.system", "postgresql")))
+	return o.DB.StartSpan(ctx, o.tableName, opts...)
 }
