@@ -22,6 +22,12 @@ import (
 	"go.uber.org/fx"
 )
 
+type Apm struct {
+	TraceProvider *sdktrace.TracerProvider
+	Tracer        *trace.Tracer
+	CollectorURL  string
+}
+
 type ApmOptions struct {
 	CollectorURL string
 	Exporter     string
@@ -35,28 +41,28 @@ func (f *FluxGo) AddApm(opt ApmOptions) *FluxGo {
 		Env:            f.Env,
 	})
 
-	apm := TApm{
+	apm := Apm{
 		TraceProvider: tp,
 		Tracer:        tracer,
 		CollectorURL:  opt.CollectorURL,
 	}
 
-	f.AddDependency(func() *TApm {
-		return &apm
-	})
-	f.AddInvoke(func(lc fx.Lifecycle, apm *TApm) error {
+	f.apm = &apm
+
+	f.AddDependency(func(lc fx.Lifecycle) *Apm {
 		lc.Append(fx.Hook{
 			OnStop: func(ctx context.Context) error {
-				return apm.TraceProvider.Shutdown(context.Background())
+				return apm.TraceProvider.Shutdown(ctx)
 			},
 		})
 
-		return nil
+		return &apm
 	})
 
-	f.apm = &apm
-
 	return f
+}
+func (f *FluxGo) GetApm() *Apm {
+	return f.apm
 }
 
 type Tracer = trace.Tracer
@@ -67,12 +73,6 @@ type Span struct {
 func (span *Span) SetError(err error) {
 	span.RecordError(err)
 	span.SetStatus(codes.Error, err.Error())
-}
-
-type TApm struct {
-	TraceProvider *sdktrace.TracerProvider
-	Tracer        *trace.Tracer
-	CollectorURL  string
 }
 
 func (s *Span) SetAttributeString(key, val string) {
@@ -126,7 +126,7 @@ func configApm(config configApmI) (*sdktrace.TracerProvider, *Tracer) {
 
 	return tp, &tracer
 }
-func (apm TApm) ShutdownApm() {
+func (apm Apm) ShutdownApm() {
 	if apm.TraceProvider == nil {
 		return
 	}
@@ -136,13 +136,13 @@ func (apm TApm) ShutdownApm() {
 	}
 }
 
-func (apm TApm) SetFiberMiddleware() func(*fiber.Ctx) error {
+func (apm Apm) SetFiberMiddleware() func(*fiber.Ctx) error {
 	return otelfiber.Middleware(otelfiber.WithSpanNameFormatter(func(ctx *fiber.Ctx) string {
 		return fmt.Sprintf("%s %s", ctx.Method(), ctx.Route().Path)
 	}))
 }
 
-func (apm TApm) StartSpan(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, Span) {
+func (apm Apm) StartSpan(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, Span) {
 	if apm.Tracer == nil {
 		return ctx, Span{trace.SpanFromContext(ctx)}
 	}
@@ -151,7 +151,7 @@ func (apm TApm) StartSpan(ctx context.Context, name string, opts ...trace.SpanSt
 
 	return ctx, Span{span}
 }
-func (apm TApm) GetSpanFromContext(ctx context.Context) Span {
+func (apm Apm) GetSpanFromContext(ctx context.Context) Span {
 	return Span{trace.SpanFromContext(ctx)}
 }
 

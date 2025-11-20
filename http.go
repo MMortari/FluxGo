@@ -15,7 +15,9 @@ import (
 )
 
 func (f *FluxGo) AddHttp(http *Http) *FluxGo {
-	f.AddDependency(http.Provider(f.apm != nil))
+	f.AddDependency(func() *Http {
+		return http
+	})
 	f.AddInvoke(func(lc fx.Lifecycle) error {
 		lc.Append(fx.Hook{
 			OnStart: http.Start,
@@ -46,25 +48,29 @@ type Http struct {
 
 type HttpOptions struct {
 	Port       int
-	ConfigApp  []func(*fiber.App)
+	ConfigApp  func(*fiber.App)
 	LogRequest bool
 
 	FiberConfig fiber.Config
+	Apm         *Apm
 }
 
 func NewHttp(opt HttpOptions) *Http {
 	app := fiber.New(opt.FiberConfig)
+
+	if opt.Apm != nil {
+		app.Use(opt.Apm.SetFiberMiddleware())
+	}
 	app.Use(helmet.New())
 	app.Use(cors.New())
 
+	if opt.ConfigApp != nil {
+		opt.ConfigApp(app)
+	}
 	if opt.LogRequest {
 		app.Use(logger.New(logger.Config{
 			Format: "${time} ${status} - ${method} ${path} ${latency}\n",
 		}))
-	}
-
-	for _, fn := range opt.ConfigApp {
-		fn(app)
 	}
 
 	http := &Http{app: app, port: opt.Port, routers: make(map[string]*fiber.Router)}
@@ -84,18 +90,6 @@ func (h *Http) Start(ctx context.Context) error {
 }
 func (h *Http) Stop(ctx context.Context) error {
 	return h.app.Shutdown()
-}
-func (h *Http) Provider(hasApm bool) interface{} {
-	if hasApm {
-		return func(apm *Apm) *Http {
-			h.GetApp().Use(apm.SetFiberMiddleware())
-			return h
-		}
-	}
-
-	return func() *Http {
-		return h
-	}
 }
 
 func (h *Http) GetApp() *fiber.App {
