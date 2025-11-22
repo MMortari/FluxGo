@@ -10,24 +10,24 @@ import (
 
 type Env struct {
 	Database struct {
-		Dsn string `env:"DATABASE_DSN" envDefault:"postgres://postgres:postgres@localhost:5435/postgres?sslmode=disable"`
+		Dsn string `env:"DATABASE_DSN" validate:"required"`
 	}
 	Redis struct {
-		Addr string `env:"REDIS_ADDR" envDefault:"localhost:6398"`
+		Addr string `env:"REDIS_ADDR" validate:"required"`
 	}
 	Logger struct {
-		Type     string `env:"LOGGER_TYPE" envDefault:"file"`
-		Level    string `env:"LOGGER_LEVEL" envDefault:"debug"`
-		FilePath string `env:"LOGGER_FILE_PATH" envDefault:"full/logs/out.log"`
+		Type     string `env:"LOGGER_TYPE" validate:"required"`
+		Level    string `env:"LOGGER_LEVEL" validate:"required"`
+		FilePath string `env:"LOGGER_FILE_PATH" validate:"required"`
 	}
 	Apm struct {
-		Exporter     string `env:"APM_EXPORTER" envDefault:"grpc"`
-		CollectorUrl string `env:"APM_COLLECTOR_URL" envDefault:"localhost:4317"`
+		Exporter     string `env:"APM_EXPORTER" validate:"required"`
+		CollectorUrl string `env:"APM_COLLECTOR_URL" validate:"required"`
 	}
 }
 
 func Module() *fluxgo.FluxGo {
-	env := fluxgo.ParseEnv[Env]()
+	env := fluxgo.ParseEnv[Env](fluxgo.EnvOptions{LoadFromFile: fluxgo.Pointer(".env.development"), Validate: true})
 
 	flux := fluxgo.New(fluxgo.FluxGo{Name: "Teste Full", Version: "1", Env: "development", Debugger: true})
 	flux.AddApm(fluxgo.ApmOptions{CollectorURL: env.Apm.CollectorUrl, Exporter: env.Apm.Exporter})
