@@ -2,6 +2,7 @@ package fluxgo
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	"github.com/gofiber/fiber/v2"
@@ -55,7 +56,7 @@ func (m *FluxModule) HttpRoute(f *FluxGo, group string, method string, path stri
 	http := f.GetHttp()
 	r := http.GetRouter(group)
 
-	r.Add(method, path, func(c *fiber.Ctx) error {
+	fun := func(c *fiber.Ctx) error {
 		income, err := config.Parse(http, c)
 		if err != nil {
 			return c.Status(err.Status).JSON(err)
@@ -71,7 +72,15 @@ func (m *FluxModule) HttpRoute(f *FluxGo, group string, method string, path stri
 		}
 
 		return nil
-	})
+	}
+
+	if r == nil {
+		http.app.Add(method, fmt.Sprintf("%s%s", group, path), fun)
+
+		return nil
+	}
+
+	(*r).Add(method, path, fun)
 
 	return nil
 }

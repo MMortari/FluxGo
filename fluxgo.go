@@ -11,10 +11,11 @@ import (
 )
 
 type FluxGo struct {
-	Name     string
-	Version  string
-	Env      string
-	Debugger bool
+	Name         string
+	Version      string
+	Env          string
+	Debugger     bool
+	FullDebugger bool
 
 	logger *Logger
 	apm    *Apm
@@ -66,7 +67,10 @@ func (f *FluxGo) GetFxConfig() []fx.Option {
 		modules = append(modules, module.toFx())
 	}
 	full = append(full, modules...)
-	full = append(full, fx.NopLogger)
+
+	if !f.FullDebugger {
+		full = append(full, fx.NopLogger)
+	}
 
 	return full
 }

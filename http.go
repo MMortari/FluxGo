@@ -165,12 +165,12 @@ func (h *Http) CreateRouter(prefix string, handlers ...fiber.Handler) *Http {
 
 	return h
 }
-func (h *Http) GetRouter(prefix string) fiber.Router {
+func (h *Http) GetRouter(prefix string) *fiber.Router {
 	route, exists := h.routers[prefix]
 	if !exists {
 		return nil
 	}
-	return *route
+	return route
 }
 
 func (h *Http) GetValidator() *Validator {
