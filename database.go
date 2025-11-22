@@ -67,8 +67,8 @@ type Entity interface {
 
 type Repository[T Entity] struct {
 	DB         *Database
-	tableName  string
-	primaryKey string
+	TableName  string
+	PrimaryKey string
 }
 
 func NewRepository[T Entity](db *Database) *Repository[T] {
@@ -76,12 +76,12 @@ func NewRepository[T Entity](db *Database) *Repository[T] {
 
 	return &Repository[T]{
 		DB:         db,
-		tableName:  entity.TableName(),
-		primaryKey: entity.PrimaryKey(),
+		TableName:  entity.TableName(),
+		PrimaryKey: entity.PrimaryKey(),
 	}
 }
 
 func (o *Repository[T]) StartSpan(ctx context.Context, opts ...trace.SpanStartOption) (context.Context, Span) {
 	opts = append(opts, trace.WithAttributes(attribute.String("db.system", "postgresql")))
-	return o.DB.StartSpan(ctx, fmt.Sprintf("repository/%s/%s", o.tableName, FunctionCaller(2)), opts...)
+	return o.DB.StartSpan(ctx, fmt.Sprintf("repository/%s/%s", o.TableName, FunctionCaller(2)), opts...)
 }
