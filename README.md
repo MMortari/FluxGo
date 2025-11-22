@@ -12,6 +12,8 @@ Flux was created to easily create applications with pre-built capability, like:
 - Redis with go-redis
 - Relational Database with sqlx
 
+For more examples, acesses this [link](https://github.com/MMortari/FluxGo/blob/main/example).
+
 ```golang
 package main
 

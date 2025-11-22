@@ -1,0 +1,28 @@
+version: "3.8"
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+      - "4317:4317"
+    environment:
+      - LOG_LEVEL=debug
+
+  database:
+    image: postgres:16
+    container_name: database
+    ports:
+      - 5435:5432
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=flux
+
+  redis:
+    container_name: redis
+    image: redis:7.4-alpine
+    restart: always
+    ports:
+      - 6398:6379
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
