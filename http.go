@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/gofiber/fiber/v2"
@@ -98,15 +100,60 @@ func NewHttp(opt HttpOptions) *Http {
 }
 
 func (h *Http) Start(ctx context.Context) error {
+	errCh := make(chan error, 1)
+
 	go func() {
-		if err := h.app.Listen(fmt.Sprintf(":%d", h.port)); err != nil {
-			log.Panic(err)
+		addr := fmt.Sprintf(":%d", h.port)
+
+		listener, err := net.Listen("tcp", addr)
+		if err != nil {
+			errCh <- fmt.Errorf("failed to bind port %d: %w", h.port, err)
+			return
+		}
+
+		errCh <- nil
+
+		if err := h.app.Listener(listener); err != nil {
+
+			select {
+			case <-ctx.Done():
+
+				return
+			default:
+
+				log.Printf("Server error: %v", err)
+			}
 		}
 	}()
-	return nil
+
+	select {
+	case err := <-errCh:
+		if err != nil {
+			return err
+		}
+
+		return nil
+
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 func (h *Http) Stop(ctx context.Context) error {
-	return h.app.Shutdown()
+	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	done := make(chan error, 1)
+
+	go func() {
+		done <- h.app.ShutdownWithContext(shutdownCtx)
+	}()
+
+	select {
+	case err := <-done:
+		return err
+	case <-shutdownCtx.Done():
+		return fmt.Errorf("shutdown timeout exceeded")
+	}
 }
 
 func (h *Http) GetApp() *fiber.App {
@@ -161,6 +208,7 @@ func (v *Validator) Run(data interface{}) (bool, *GlobalError) {
 		Code:    "error.validation",
 		Success: false,
 		Errors:  validationErrors,
+		Status:  400,
 	}
 
 	return hasError, errors
