@@ -10,6 +10,7 @@ import (
 func Module() *fluxgo.FluxGo {
 	flux := fluxgo.New(fluxgo.FluxGo{Name: "Teste Full", Version: "1", Env: "development", Debugger: true})
 	flux.AddApm(fluxgo.ApmOptions{CollectorURL: "localhost:4317", Exporter: "grpc"})
+	flux.ConfigLogger(fluxgo.LoggerOptions{Type: "file", Level: "debug", LogFilePath: "full/logs/out.log"})
 
 	http := fluxgo.NewHttp(fluxgo.HttpOptions{Port: 3333, LogRequest: true, Apm: flux.GetApm()})
 	http.CreateRouter("/public")

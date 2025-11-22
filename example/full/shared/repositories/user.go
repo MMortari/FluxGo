@@ -13,7 +13,7 @@ type UserRepository struct {
 }
 
 func UserRepositoryStart(db *fluxgo.Database) *UserRepository {
-	return &UserRepository{*fluxgo.NewRepository[entities.User](db, "user")}
+	return &UserRepository{*fluxgo.NewRepository[entities.User](db)}
 }
 
 func (r *UserRepository) GetUser(ctx context.Context) (*entities.User, error) {

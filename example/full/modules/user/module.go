@@ -22,9 +22,10 @@ func Module() *fluxgo.FluxModule {
 			return &fluxgo.GlobalResponse{Content: resp, Status: 200}, nil
 		})
 	})
-	mod.AddRoute(func(cron *fluxgo.Cron, handler *handlers.HandlerGetUser) error {
+	mod.AddRoute(func(cron *fluxgo.Cron, logger *fluxgo.Logger, handler *handlers.HandlerGetUser) error {
 		return mod.CronRoute(cron, "* * * * *", func(ctx context.Context) error {
-			log.Printf("Cron execute\n")
+			logger.Infoln("Cron executed")
+			log.Println("Cron executed")
 			return nil
 		})
 	})
