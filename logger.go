@@ -21,13 +21,11 @@ func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
 	handleLogLevel(log, opt)
 	handleLogType(log, opt)
 
-	log.WithFields(logrus.Fields{
+	f.logger = log.WithFields(logrus.Fields{
 		"environment":     f.Env,
 		"service.name":    f.Name,
 		"service.version": f.Version,
 	})
-
-	f.logger = logrus.NewEntry(log)
 
 	return f
 }

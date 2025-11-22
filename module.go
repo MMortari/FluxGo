@@ -16,7 +16,7 @@ type FluxModule struct {
 }
 
 func Module(name string) *FluxModule {
-	return &FluxModule{Name: name}
+	return &FluxModule{name, make([]fx.Option, 0), make([]fx.Option, 0)}
 }
 
 func (f *FluxModule) toFx() fx.Option {

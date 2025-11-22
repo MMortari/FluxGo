@@ -1,6 +1,6 @@
 module github.com/MMortari/FluxGo
 
-go 1.25.0
+go 1.25
 
 require (
 	github.com/go-co-op/gocron/v2 v2.18.0

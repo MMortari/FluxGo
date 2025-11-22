@@ -92,9 +92,6 @@ func (span *Span) SetError(err error) {
 func (s *Span) SetAttributeString(key, val string) {
 	s.SetAttributes(attribute.String(key, val))
 }
-func (s *Span) SetAttributeNumber(key string, val string) {
-	s.SetAttributes(attribute.String(key, val))
-}
 
 type configApmI struct {
 	ApmOptions

@@ -71,7 +71,7 @@ type Repository[T Entity] struct {
 	primaryKey string
 }
 
-func NewRepository[T Entity](db *Database, tableName string) *Repository[T] {
+func NewRepository[T Entity](db *Database) *Repository[T] {
 	var entity T
 
 	return &Repository[T]{

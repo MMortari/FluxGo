@@ -3,6 +3,7 @@ package fluxgo
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
@@ -53,6 +54,8 @@ func (f *FluxGo) AddModule(mod *FluxModule) *FluxGo {
 }
 
 func (f *FluxGo) GetFxConfig() []fx.Option {
+	f.AddDependency(func() *Logger { return f.logger })
+
 	f.dependencies = append(f.dependencies, fx.Provide(func() *FluxGo {
 		return f
 	}))
@@ -86,6 +89,6 @@ func (f *FluxGo) GetTestApp(t *testing.T) (*fxtest.App, *fiber.App) {
 
 func (f *FluxGo) log(key, message string) {
 	if f.Debugger {
-		fmt.Printf("[%s]: %s\n", key, message)
+		fmt.Printf("%s [%s]: %s\n", time.Now().Format(time.DateTime), key, message)
 	}
 }

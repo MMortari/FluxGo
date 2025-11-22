@@ -44,7 +44,7 @@ func (f *FluxGo) AddRedis(opt RedisOptions) *FluxGo {
 	return f
 }
 func (r *Redis) connect(ctx context.Context) error {
-	if err := r.client.Ping(context.Background()).Err(); err != nil {
+	if err := r.client.Ping(ctx).Err(); err != nil {
 		return err
 	}
 
