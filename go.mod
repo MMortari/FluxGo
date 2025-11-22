@@ -1,8 +1,9 @@
 module github.com/MMortari/FluxGo
 
-go 1.25
+go 1.25.0
 
 require (
+	github.com/caarlos0/env/v11 v11.3.1
 	github.com/go-co-op/gocron/v2 v2.18.0
 	github.com/go-playground/validator/v10 v10.28.0
 	github.com/gofiber/contrib/otelfiber/v2 v2.2.3
