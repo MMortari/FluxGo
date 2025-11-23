@@ -15,16 +15,24 @@ type EnvOptions struct {
 }
 
 func ParseEnv[T any](opts EnvOptions) T {
-	var empty T
-
 	if opts.LoadFromFile != nil {
-		if _, err := os.Stat(*opts.LoadFromFile); err != nil {
-			return empty
-		}
+		path := *opts.LoadFromFile
+		found := false
+		for i := 0; i < 10; i++ {
+			if _, err := os.Stat(path); err != nil {
+				path = "../" + path
+				continue
+			}
+			found = true
 
-		err := godotenv.Load(*opts.LoadFromFile)
-		if err != nil {
-			log.Printf("Error loading %s file: %v", *opts.LoadFromFile, err)
+			err := godotenv.Load(path)
+			if err != nil {
+				log.Printf("Error loading %s file: %v", *opts.LoadFromFile, err)
+			}
+			break
+		}
+		if !found {
+			log.Fatalf("File not found for parse: %s", *opts.LoadFromFile)
 		}
 	}
 
