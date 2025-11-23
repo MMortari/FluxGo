@@ -42,3 +42,26 @@ func ParseEnv[T any](opts EnvOptions) T {
 
 	return config
 }
+
+type Env struct {
+	Env string `env:"ENV"`
+}
+
+func (e Env) IsProduction() bool {
+	return e.Env == "production"
+}
+func (e Env) IsSandbox() bool {
+	return e.Env == "sandbox"
+}
+func (e Env) IsDevelopment() bool {
+	return e.Env == "development"
+}
+func (e Env) IsTest() bool {
+	return e.Env == "test"
+}
+
+// IsDeployed returns true if the environment is either production or sandbox.
+// It is used to determine if the application is running in a deployed state.
+func (e Env) IsDeployed() bool {
+	return e.IsProduction() || e.IsSandbox()
+}
