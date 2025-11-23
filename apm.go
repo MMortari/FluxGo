@@ -34,11 +34,15 @@ type ApmOptions struct {
 }
 
 func (f *FluxGo) AddApm(opt ApmOptions) *FluxGo {
+	if f.Env.IsTest() {
+		return f
+	}
+
 	tp, tracer := configApm(configApmI{
 		ApmOptions:     opt,
 		ServiceName:    f.Name,
 		ServiceVersion: f.Version,
-		Env:            f.Env,
+		Env:            f.Env.Env,
 	})
 
 	apm := Apm{

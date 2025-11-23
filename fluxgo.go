@@ -13,13 +13,13 @@ import (
 type FluxGo struct {
 	Name         string
 	Version      string
-	Env          string
 	Debugger     bool
 	FullDebugger bool
 
 	logger *Logger
 	apm    *Apm
 	http   *Http
+	Env    *Env
 
 	dependencies []fx.Option
 	invokes      []fx.Option
