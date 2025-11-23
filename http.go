@@ -249,3 +249,20 @@ func ErrorNotFound(message string) *GlobalError {
 		Success: false,
 	}
 }
+func ErrorBadRequest(message, code string) *GlobalError {
+	return &GlobalError{
+		Message: message,
+		Code:    code,
+		Status:  http.StatusBadRequest,
+		Success: false,
+	}
+}
+func ErrorBadRequestUser(message, code, userMessage string) *GlobalError {
+	return &GlobalError{
+		Message:     message,
+		Code:        code,
+		Status:      http.StatusBadRequest,
+		UserMessage: userMessage,
+		Success:     false,
+	}
+}
