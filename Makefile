@@ -1,5 +1,5 @@
 test:
-	go test ./... -cover
+	ENV=test go test . -cover
 
 lint:
 	golangci-lint run

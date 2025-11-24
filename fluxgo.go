@@ -29,6 +29,11 @@ func New(config FluxGo) *FluxGo {
 	init := config
 	init.dependencies = []fx.Option{}
 
+	if init.Env == nil {
+		env := ParseEnv[Env](EnvOptions{})
+		init.Env = &env
+	}
+
 	init.ConfigLogger(LoggerOptions{Type: "console"})
 
 	return &init
