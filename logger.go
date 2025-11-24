@@ -16,13 +16,17 @@ type LoggerOptions struct {
 }
 
 func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
+	if f.Env.IsTest() {
+		opt.Type = "console"
+	}
+
 	log := logrus.New()
 
 	handleLogLevel(log, opt)
 	handleLogType(log, opt)
 
 	f.logger = log.WithFields(logrus.Fields{
-		"environment":     f.Env,
+		"environment":     f.Env.Env,
 		"service.name":    f.Name,
 		"service.version": f.Version,
 	})

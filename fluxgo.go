@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gofiber/fiber/v2"
 	"go.uber.org/fx"
 	"go.uber.org/fx/fxtest"
 )
@@ -79,16 +78,19 @@ func (f *FluxGo) Run() {
 	fx.New(f.GetFxConfig()...).Run()
 }
 
-func (f *FluxGo) GetTestApp(t *testing.T) (*fxtest.App, *fiber.App) {
-	var app *fiber.App
+func (f *FluxGo) GetTestApp(t *testing.T) (*fxtest.App, *Http) {
+	f.Debugger = false
+	f.FullDebugger = false
 
-	opts := append(f.GetFxConfig(), fx.Invoke(func(a *fiber.App) {
-		app = a
+	var http *Http
+
+	opts := append(f.GetFxConfig(), fx.Invoke(func(h *Http) {
+		http = h
 	}), fx.NopLogger)
 
 	fxApp := fxtest.New(t, opts...)
 
-	return fxApp, app
+	return fxApp, http
 }
 
 func (f *FluxGo) log(key, message string) {
