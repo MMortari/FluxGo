@@ -221,8 +221,8 @@ type errorResponse struct {
 }
 
 type GlobalResponse struct {
-	Status  int
-	Content interface{}
+	Status  int         `json:"status"`
+	Content interface{} `json:"content"`
 }
 type GlobalError struct {
 	Message     string `json:"message,omitempty"`
