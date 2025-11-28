@@ -8,7 +8,7 @@ import (
 
 func TestMain(t *testing.T) {
 	t.Run("TestDependenciesAreSatisfied", func(t *testing.T) {
-		flux := New(FluxGo{Name: "Test", Debugger: true})
+		flux := New(FluxGoConfig{Name: "Test", Debugger: true})
 
 		if err := fx.ValidateApp(flux.GetFxConfig()...); err != nil {
 			t.Error(err)

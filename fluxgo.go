@@ -2,6 +2,7 @@ package fluxgo
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -10,24 +11,32 @@ import (
 )
 
 type FluxGo struct {
-	Name         string
-	Version      string
-	Debugger     bool
-	FullDebugger bool
+	FluxGoConfig
+	cleanName string
 
 	logger *Logger
 	apm    *Apm
 	http   *Http
-	Env    *Env
 
 	dependencies []fx.Option
 	invokes      []fx.Option
 	modules      []*FluxModule
 }
+type FluxGoConfig struct {
+	Name         string
+	Version      string
+	Debugger     bool
+	FullDebugger bool
+	Env          *Env
+}
 
-func New(config FluxGo) *FluxGo {
-	init := config
-	init.dependencies = []fx.Option{}
+func New(config FluxGoConfig) *FluxGo {
+	var init FluxGo = FluxGo{
+		FluxGoConfig: config,
+		cleanName:    strings.ReplaceAll(strings.ToLower(config.Name), " ", "_"),
+		dependencies: []fx.Option{},
+		invokes:      []fx.Option{},
+	}
 
 	if init.Env == nil {
 		env := ParseEnv[Env](EnvOptions{})
@@ -37,6 +46,13 @@ func New(config FluxGo) *FluxGo {
 	init.ConfigLogger(LoggerOptions{Type: "console"})
 
 	return &init
+}
+
+func (f *FluxGo) GetName() string {
+	return f.Name
+}
+func (f *FluxGo) GetCleanName() string {
+	return f.cleanName
 }
 
 func (f *FluxGo) AddDependency(constructors ...interface{}) *FluxGo {

@@ -27,7 +27,7 @@ func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
 
 	f.logger = log.WithFields(logrus.Fields{
 		"environment":     f.Env.Env,
-		"service.name":    f.Name,
+		"service.name":    f.GetCleanName(),
 		"service.version": f.Version,
 	})
 

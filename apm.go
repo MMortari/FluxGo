@@ -36,7 +36,7 @@ type ApmOptions struct {
 func (f *FluxGo) AddApm(opt ApmOptions) *FluxGo {
 	tp, tracer := configApm(configApmI{
 		ApmOptions:     opt,
-		ServiceName:    f.Name,
+		ServiceName:    f.GetCleanName(),
 		ServiceVersion: f.Version,
 		Env:            f.Env.Env,
 	})
