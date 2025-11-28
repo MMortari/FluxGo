@@ -31,7 +31,7 @@ type FluxGoConfig struct {
 }
 
 func New(config FluxGoConfig) *FluxGo {
-	var init FluxGo = FluxGo{
+	init := FluxGo{
 		FluxGoConfig: config,
 		cleanName:    strings.ReplaceAll(strings.ToLower(config.Name), " ", "_"),
 		dependencies: []fx.Option{},
