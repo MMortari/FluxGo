@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"log"
+	"time"
 
 	fluxgo "github.com/MMortari/FluxGo"
 	"github.com/MMortari/FluxGo/example/full/modules/user/handlers"
@@ -13,8 +14,36 @@ func Module() *fluxgo.FluxModule {
 	mod := fluxgo.Module("user")
 
 	mod.AddHandler(handlers.HandlerGetUserStart)
-	mod.AddRoute(func(f *fluxgo.FluxGo, handler *handlers.HandlerGetUser) error {
-		return mod.HttpRoute(f, "/public", "GET", "/user", fluxgo.RouteIncome{}, func(c *fiber.Ctx, income interface{}) (*fluxgo.GlobalResponse, *fluxgo.GlobalError) {
+
+	mod.AddRoute(func(f *fluxgo.FluxGo, redis *fluxgo.Redis, handler *handlers.HandlerGetUser) error {
+		return mod.HttpRoute(f, "/public", "GET", "/user", fluxgo.RouteIncome{
+			Cache:    redis,
+			CacheTTL: time.Hour,
+		}, func(c *fiber.Ctx, income interface{}) (*fluxgo.GlobalResponse, *fluxgo.GlobalError) {
+			resp, err := handler.Execute(c.UserContext(), "")
+			if err != nil {
+				return nil, err
+			}
+			return &fluxgo.GlobalResponse{Content: resp, Status: 200}, nil
+		})
+	})
+	mod.AddRoute(func(f *fluxgo.FluxGo, redis *fluxgo.Redis, handler *handlers.HandlerGetUser) error {
+		return mod.HttpRoute(f, "/public", "GET", "/user/:id_user", fluxgo.RouteIncome{
+			Cache:    redis,
+			CacheTTL: time.Hour,
+		}, func(c *fiber.Ctx, income interface{}) (*fluxgo.GlobalResponse, *fluxgo.GlobalError) {
+			resp, err := handler.Execute(c.UserContext(), "")
+			if err != nil {
+				return nil, err
+			}
+			return &fluxgo.GlobalResponse{Content: resp, Status: 200}, nil
+		})
+	})
+	mod.AddRoute(func(f *fluxgo.FluxGo, redis *fluxgo.Redis, handler *handlers.HandlerGetUser) error {
+		return mod.HttpRoute(f, "/public", "POST", "/refresh", fluxgo.RouteIncome{
+			Cache:           redis,
+			CacheInvalidate: []string{"/public/user"},
+		}, func(c *fiber.Ctx, income interface{}) (*fluxgo.GlobalResponse, *fluxgo.GlobalError) {
 			resp, err := handler.Execute(c.UserContext(), "")
 			if err != nil {
 				return nil, err

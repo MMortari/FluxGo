@@ -32,6 +32,11 @@ jobs:
           version: v2.4
           skip-cache: false
 
-      - name: E2E Test
+      - name: Test
         run: |
           ENV=test go test . -cover
+
+      - name: Test Examples
+        run: |
+          cd example/full
+          ENV=test go test ./... -cover

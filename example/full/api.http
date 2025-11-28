@@ -1,0 +1,10 @@
+GET http://localhost:3333/public/user
+content-type: application/json
+
+###
+GET http://localhost:3333/public/user/1
+content-type: application/json
+
+###
+POST http://localhost:3333/public/refresh
+content-type: application/json

@@ -12,7 +12,7 @@ import (
 func Module() *fluxgo.FluxGo {
 	env := fluxgo.ParseEnv[config.Env](fluxgo.EnvOptions{LoadFromFile: fluxgo.Pointer(".env.development"), Validate: true})
 
-	flux := fluxgo.New(fluxgo.FluxGo{Name: "Teste Full", Version: "1", Env: &env.Env, Debugger: true})
+	flux := fluxgo.New(fluxgo.FluxGoConfig{Name: "Teste Full", Version: "1", Env: &env.Env, Debugger: true})
 	flux.AddApm(fluxgo.ApmOptions{CollectorURL: env.Apm.CollectorUrl, Exporter: env.Apm.Exporter})
 	flux.ConfigLogger(fluxgo.LoggerOptions{Type: env.Logger.Type, Level: env.Logger.Level, LogFilePath: env.Logger.FilePath})
 
