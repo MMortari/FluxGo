@@ -36,7 +36,12 @@ jobs:
         run: |
           ENV=test go test . -cover
 
-      - name: Test Examples
+      - name: Docker Examples
+        working-directory: example/full
         run: |
-          cd example/full
+          docker compose up -d
+
+      - name: Test Examples
+        working-directory: example/full
+        run: |
           ENV=test go test ./... -cover
