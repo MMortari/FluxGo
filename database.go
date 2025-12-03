@@ -2,9 +2,15 @@ package fluxgo
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"os"
+	"path"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 	"go.opentelemetry.io/otel/attribute"
@@ -54,6 +60,84 @@ func (f *FluxGo) AddDatabase(opt DatabaseOptions) *FluxGo {
 	})
 
 	return f
+}
+
+type DatabaseMigrationsOptions struct {
+	Dir    string
+	Config *postgres.Config
+}
+
+func (f *FluxGo) RunMigrations(ctx context.Context, opt DatabaseMigrationsOptions) error {
+	opts := append(f.GetFxConfig(), fx.Invoke(func(lc fx.Lifecycle, db *Database) {
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				log.Println("Starting migrations...")
+
+				wd, err := os.Getwd()
+				if err != nil {
+					return fmt.Errorf("error to get pwd: %v", err)
+				}
+
+				joined := path.Join(wd, opt.Dir)
+				migrationsDirFile := "file://" + joined
+
+				var postgresConfig = opt.Config
+				if postgresConfig == nil {
+					postgresConfig = &postgres.Config{}
+				}
+
+				driver, err := postgres.WithInstance(db.DB.DB, postgresConfig)
+				if err != nil {
+					return fmt.Errorf("error to get pg driver: %v", err)
+				}
+
+				migrator, err := migrate.NewWithDatabaseInstance(migrationsDirFile, "postgres", driver)
+				if err != nil {
+					return fmt.Errorf("unable to create migration: %v", err)
+				}
+				defer func() {
+					if err1, err2 := migrator.Close(); err1 != nil || err2 != nil {
+						log.Printf("error closing migrator: %v", err1)
+						log.Printf("error closing migrator: %v", err2)
+					}
+				}()
+
+				if err := migrator.Up(); err != nil {
+					if errors.Is(err, migrate.ErrNoChange) {
+						log.Println("No changes to be applied")
+						return nil
+					} else {
+						return fmt.Errorf("unable to apply migrations %v", err)
+					}
+				}
+
+				log.Println("Migrations done!")
+
+				return nil
+			},
+		})
+	}), fx.NopLogger)
+
+	return fx.New(opts...).Start(ctx)
+}
+func (f *FluxGo) RunSeeds(ctx context.Context, query string) error {
+	opts := append(f.GetFxConfig(), fx.Invoke(func(lc fx.Lifecycle, db *Database) {
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				log.Println("Starting seeds...")
+
+				if _, err := db.ExecContext(ctx, query); err != nil {
+					return fmt.Errorf("unable to apply seeds: %v", err)
+				}
+
+				log.Println("Seeds done!")
+
+				return nil
+			},
+		})
+	}), fx.NopLogger)
+
+	return fx.New(opts...).Start(ctx)
 }
 
 func (d *Database) StartSpan(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, Span) {

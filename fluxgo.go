@@ -45,6 +45,9 @@ func New(config FluxGoConfig) *FluxGo {
 
 	init.ConfigLogger(LoggerOptions{Type: "console"})
 
+	init.dependencies = append(init.dependencies, fx.Provide(func() *FluxGo { return &init }))
+	init.dependencies = append(init.dependencies, fx.Provide(func() *Logger { return init.logger }))
+
 	return &init
 }
 
@@ -75,12 +78,6 @@ func (f *FluxGo) AddModule(mod *FluxModule) *FluxGo {
 }
 
 func (f *FluxGo) GetFxConfig() []fx.Option {
-	f.AddDependency(func() *Logger { return f.logger })
-
-	f.dependencies = append(f.dependencies, fx.Provide(func() *FluxGo {
-		return f
-	}))
-
 	full := append(f.dependencies, f.invokes...)
 	modules := []fx.Option{}
 	for _, module := range f.modules {
