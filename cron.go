@@ -41,8 +41,7 @@ func (f *FluxGo) AddCron() *FluxGo {
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				err := cron.scheduler.Shutdown()
-				if err != nil {
+				if err := cron.scheduler.Shutdown(); err != nil {
 					return err
 				}
 				cron.cancel()

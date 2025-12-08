@@ -40,16 +40,14 @@ func (f *FluxGo) AddDatabase(opt DatabaseOptions) *FluxGo {
 	f.AddInvoke(func(lc fx.Lifecycle, db *Database) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				err := db.Ping()
-				if err != nil {
+				if err := db.Ping(); err != nil {
 					return err
 				}
 				f.log("DATABASE", "Connected")
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				err := db.Close()
-				if err != nil {
+				if err := db.Close(); err != nil {
 					return err
 				}
 				f.log("DATABASE", "Disconnected")

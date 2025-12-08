@@ -59,8 +59,7 @@ func (f *FluxGo) AddApm(opt ApmOptions) *FluxGo {
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				err := apm.TraceProvider.Shutdown(ctx)
-				if err != nil {
+				if err := apm.TraceProvider.Shutdown(ctx); err != nil {
 					return err
 				}
 				f.log("APM", "Stopped")

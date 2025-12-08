@@ -25,8 +25,7 @@ func ParseEnv[T any](opts EnvOptions) T {
 			}
 			found = true
 
-			err := godotenv.Load(path)
-			if err != nil {
+			if err := godotenv.Load(path); err != nil {
 				log.Printf("Error loading %s file: %v", *opts.LoadFromFile, err)
 			}
 			break

@@ -23,8 +23,7 @@ func (f *FluxGo) AddHttp(http *Http) *FluxGo {
 	f.AddInvoke(func(lc fx.Lifecycle) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				err := http.Start(ctx)
-				if err != nil {
+				if err := http.Start(ctx); err != nil {
 					return err
 				}
 				f.log("HTTP", fmt.Sprintf("Running on port %d", http.port))
@@ -32,8 +31,7 @@ func (f *FluxGo) AddHttp(http *Http) *FluxGo {
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				err := http.Stop(ctx)
-				if err != nil {
+				if err := http.Stop(ctx); err != nil {
 					return err
 				}
 				f.log("HTTP", "Stopped")
@@ -188,9 +186,7 @@ func (v *Validator) Run(data interface{}) (bool, *GlobalError) {
 
 	validationErrors := []errorResponse{}
 
-	errs := validate.Struct(data)
-
-	if errs != nil {
+	if errs := validate.Struct(data); errs != nil {
 		for _, err := range errs.(validator.ValidationErrors) {
 			var elem errorResponse
 

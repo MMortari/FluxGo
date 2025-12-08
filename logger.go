@@ -76,10 +76,10 @@ func handleLogType(log *logrus.Logger, opt LoggerOptions) {
 }
 
 func (f *FluxGo) CreateLogger(c context.Context) *Logger {
-	spanFields := logrus.Fields{}
-
 	if f.apm != nil {
 		span := f.apm.GetSpanFromContext(c)
+
+		spanFields := logrus.Fields{}
 
 		if span.SpanContext().HasTraceID() {
 			spanFields["trace.id"] = span.SpanContext().TraceID().String()

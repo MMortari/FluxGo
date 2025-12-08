@@ -25,16 +25,14 @@ func (f *FluxGo) AddRedis(opt RedisOptions) *FluxGo {
 	f.AddInvoke(func(lc fx.Lifecycle, redis *Redis) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				err := redis.connect(ctx)
-				if err != nil {
+				if err := redis.connect(ctx); err != nil {
 					return err
 				}
 				f.log("REDIS", "Connected")
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				err := redis.disconnect()
-				if err != nil {
+				if err := redis.disconnect(); err != nil {
 					return err
 				}
 				f.log("REDIS", "Disconnected")
@@ -104,8 +102,7 @@ func (r *Redis) Invalidate(ctx context.Context, keys []string) error {
 	delKeys := make([]string, 0, len(keys))
 
 	for _, key := range keys {
-		iter := r.client.Scan(ctx, 0, key, 0).Iterator()
-		for iter.Next(ctx) {
+		for iter := r.client.Scan(ctx, 0, key, 0).Iterator(); iter.Next(ctx); {
 			delKeys = append(delKeys, iter.Val())
 		}
 	}
