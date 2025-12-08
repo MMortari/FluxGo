@@ -2,4 +2,4 @@ test:
 	ENV=test go test . -cover
 
 lint:
-	./golangci-lint run
+	scopeguard ./... && golangci-lint run
