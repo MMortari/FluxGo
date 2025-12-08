@@ -25,10 +25,17 @@ jobs:
         with:
           go-version-file: go.mod
 
-      - name: Running lint
+      - name: Running scopeguard
         run: |
-          ls -la
-          ./golangci-lint run
+          go install fillmore-labs.com/scopeguard@latest
+          scopeguard ./...
+
+      - name: Running lint
+        uses: golangci/golangci-lint-action@v8
+        timeout-minutes: 5
+        with:
+          version: v2.4
+          skip-cache: false
 
       - name: Test
         run: |
