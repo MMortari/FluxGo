@@ -1,6 +1,7 @@
 package fluxgo
 
 import (
+	"math/rand"
 	"runtime"
 	"strings"
 )
@@ -23,4 +24,8 @@ func FunctionCaller(skip int) string {
 	splitted := strings.Split((caller.Name()), ".")
 
 	return splitted[len(splitted)-1]
+}
+
+func GetRandomNumber(max int) int {
+	return rand.Intn(max + 1)
 }
