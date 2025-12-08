@@ -27,6 +27,7 @@ jobs:
 
       - name: Running lint
         run: |
+          ls -la
           ./golangci-lint run
 
       - name: Test
