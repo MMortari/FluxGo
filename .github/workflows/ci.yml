@@ -26,11 +26,8 @@ jobs:
           go-version-file: go.mod
 
       - name: Running lint
-        uses: golangci/golangci-lint-action@v8
-        timeout-minutes: 5
-        with:
-          version: v2.4
-          skip-cache: false
+        run: |
+          ./golangci-lint run
 
       - name: Test
         run: |
