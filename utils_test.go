@@ -22,7 +22,6 @@ func TestUtil(t *testing.T) {
 
 		for i := 0; i < 100; i++ {
 			val := GetRandomNumber(max)
-			println(val)
 			assert.Truef(t, val >= 0 && val < max, "Invalid number")
 		}
 	})

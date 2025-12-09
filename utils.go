@@ -1,7 +1,7 @@
 package fluxgo
 
 import (
-	"math/rand"
+	"math/rand/v2"
 	"runtime"
 	"strings"
 )
@@ -27,5 +27,5 @@ func FunctionCaller(skip int) string {
 }
 
 func GetRandomNumber(max int) int {
-	return rand.Intn(max)
+	return rand.IntN(max)
 }
