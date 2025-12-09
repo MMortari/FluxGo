@@ -108,14 +108,13 @@ func (d *Database) Disconnect() error {
 func (d *Database) WriteDB() *sqlx.DB {
 	switch size := len(d.primaryDBs); size {
 	case 0:
-		log.Panic("No primary database configured")
+		panic("No primary database configured")
 	case 1:
 		return d.primaryDBs[0]
 	default:
 		index := GetRandomNumber(size)
 		return d.primaryDBs[index]
 	}
-	return nil
 }
 func (d *Database) ReadOnlyDB() *sqlx.DB {
 	switch size := len(d.replicaDBs); size {
