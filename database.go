@@ -16,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
+	"go.uber.org/multierr"
 )
 
 type Database struct {
@@ -77,30 +78,32 @@ func (f *FluxGo) AddDatabase(opt ...DatabaseOptions) *FluxGo {
 }
 
 func (d *Database) Connect(ctx context.Context) error {
+	var err error
 	for _, db := range d.primaryDBs {
-		if err := db.PingContext(ctx); err != nil {
-			return err
+		if e := db.PingContext(ctx); e != nil {
+			err = multierr.Append(err, e)
 		}
 	}
 	for _, db := range d.replicaDBs {
-		if err := db.PingContext(ctx); err != nil {
-			return err
+		if e := db.PingContext(ctx); e != nil {
+			err = multierr.Append(err, e)
 		}
 	}
-	return nil
+	return err
 }
 func (d *Database) Disconnect() error {
+	var err error
 	for _, db := range d.primaryDBs {
-		if err := db.Close(); err != nil {
-			return err
+		if e := db.Close(); e != nil {
+			err = multierr.Append(err, e)
 		}
 	}
 	for _, db := range d.replicaDBs {
-		if err := db.Close(); err != nil {
-			return err
+		if e := db.Close(); e != nil {
+			err = multierr.Append(err, e)
 		}
 	}
-	return nil
+	return err
 }
 func (d *Database) WriteDB() *sqlx.DB {
 	switch size := len(d.primaryDBs); size {
