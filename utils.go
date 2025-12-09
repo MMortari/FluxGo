@@ -27,5 +27,5 @@ func FunctionCaller(skip int) string {
 }
 
 func GetRandomNumber(max int) int {
-	return rand.Intn(max + 1)
+	return rand.Intn(max)
 }
