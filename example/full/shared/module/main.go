@@ -1,6 +1,9 @@
 package module
 
 import (
+	"strings"
+
+	"github.com/IBM/sarama"
 	fluxgo "github.com/MMortari/FluxGo"
 	"github.com/MMortari/FluxGo/example/full/config"
 	"github.com/MMortari/FluxGo/example/full/modules/user"
@@ -17,6 +20,7 @@ func Module() *fluxgo.FluxGo {
 	flux.ConfigLogger(fluxgo.LoggerOptions{Type: env.Logger.Type, Level: env.Logger.Level, LogFilePath: env.Logger.FilePath})
 
 	flux.AddDependency(func() *config.Env { return &env })
+	flux.AddKafka(fluxgo.KafkaOptions{Brokers: strings.Split(env.Kafka.Brokers, ","), UsesTls: env.Kafka.SSL == "true", Producer: fluxgo.KafkaProducerOptions{Acks: sarama.WaitForAll}, Consumer: fluxgo.KafkaConsumerOptions{AutoCommitEnable: true, GroupId: flux.GetCleanName()}})
 	flux.AddDatabase(fluxgo.DatabaseOptions{Dsn: env.Database.Dsn})
 	flux.AddRedis(fluxgo.RedisOptions{Options: redis.Options{Addr: env.Redis.Addr}})
 	flux.AddCron()
