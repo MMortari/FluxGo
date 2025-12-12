@@ -22,7 +22,7 @@ func (r *UserRepository) GetUser(ctx context.Context) (*entities.User, error) {
 
 	var user entities.User
 
-	err := r.DB.GetContext(ctx, &user, "SELECT '299f3dcd-42f3-46c1-89d5-603c78a78f50' as id, 'John' AS name")
+	err := r.DB.ReadOnlyDB().GetContext(ctx, &user, "SELECT '299f3dcd-42f3-46c1-89d5-603c78a78f50' as id, 'John' AS name")
 	if err == sql.ErrNoRows {
 		return nil, nil
 	}

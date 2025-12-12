@@ -16,38 +16,55 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
+	"go.uber.org/multierr"
 )
 
 type Database struct {
-	*sqlx.DB
+	primaryDBs []*sqlx.DB
+	replicaDBs []*sqlx.DB
+
 	apm *Apm
 }
 type DatabaseOptions struct {
-	Dsn string
+	Dsn  string
+	Type string
 }
 
-func (f *FluxGo) AddDatabase(opt DatabaseOptions) *FluxGo {
+func (f *FluxGo) AddDatabase(opt ...DatabaseOptions) *FluxGo {
 	f.AddDependency(func(apm *Apm) *Database {
-		db, err := sqlx.Open("postgres", opt.Dsn)
-		if err != nil {
-			log.Fatalln("Error to create database client", err)
+		database := Database{
+			primaryDBs: []*sqlx.DB{},
+			replicaDBs: []*sqlx.DB{},
+			apm:        apm,
 		}
 
-		database := Database{db, apm}
+		for _, item := range opt {
+			db, err := sqlx.Open("postgres", item.Dsn)
+			if err != nil {
+				log.Fatalln("Error to create database client", err)
+			}
+
+			switch item.Type {
+			case "replica":
+				database.replicaDBs = append(database.replicaDBs, db)
+			default:
+				database.primaryDBs = append(database.primaryDBs, db)
+			}
+		}
 
 		return &database
 	})
 	f.AddInvoke(func(lc fx.Lifecycle, db *Database) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				if err := db.Ping(); err != nil {
+				if err := db.Connect(ctx); err != nil {
 					return err
 				}
 				f.log("DATABASE", "Connected")
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				if err := db.Close(); err != nil {
+				if err := db.Disconnect(); err != nil {
 					return err
 				}
 				f.log("DATABASE", "Disconnected")
@@ -58,6 +75,57 @@ func (f *FluxGo) AddDatabase(opt DatabaseOptions) *FluxGo {
 	})
 
 	return f
+}
+
+func (d *Database) Connect(ctx context.Context) error {
+	var err error
+	for _, db := range d.primaryDBs {
+		if e := db.PingContext(ctx); e != nil {
+			err = multierr.Append(err, e)
+		}
+	}
+	for _, db := range d.replicaDBs {
+		if e := db.PingContext(ctx); e != nil {
+			err = multierr.Append(err, e)
+		}
+	}
+	return err
+}
+func (d *Database) Disconnect() error {
+	var err error
+	for _, db := range d.primaryDBs {
+		if e := db.Close(); e != nil {
+			err = multierr.Append(err, e)
+		}
+	}
+	for _, db := range d.replicaDBs {
+		if e := db.Close(); e != nil {
+			err = multierr.Append(err, e)
+		}
+	}
+	return err
+}
+func (d *Database) WriteDB() *sqlx.DB {
+	switch size := len(d.primaryDBs); size {
+	case 0:
+		panic("No primary database configured")
+	case 1:
+		return d.primaryDBs[0]
+	default:
+		index := GetRandomNumber(size)
+		return d.primaryDBs[index]
+	}
+}
+func (d *Database) ReadOnlyDB() *sqlx.DB {
+	switch size := len(d.replicaDBs); size {
+	case 0:
+		return d.WriteDB()
+	case 1:
+		return d.replicaDBs[0]
+	default:
+		index := GetRandomNumber(size)
+		return d.replicaDBs[index]
+	}
 }
 
 type DatabaseMigrationsOptions struct {
@@ -84,7 +152,7 @@ func (f *FluxGo) RunMigrations(ctx context.Context, opt DatabaseMigrationsOption
 					postgresConfig = &postgres.Config{}
 				}
 
-				driver, err := postgres.WithInstance(db.DB.DB, postgresConfig)
+				driver, err := postgres.WithInstance(db.WriteDB().DB, postgresConfig)
 				if err != nil {
 					return fmt.Errorf("error to get pg driver: %v", err)
 				}
@@ -124,7 +192,7 @@ func (f *FluxGo) RunSeeds(ctx context.Context, query string) error {
 			OnStart: func(ctx context.Context) error {
 				log.Println("Starting seeds...")
 
-				if _, err := db.ExecContext(ctx, query); err != nil {
+				if _, err := db.WriteDB().ExecContext(ctx, query); err != nil {
 					return fmt.Errorf("unable to apply seeds: %v", err)
 				}
 
