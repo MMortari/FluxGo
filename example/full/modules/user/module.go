@@ -51,10 +51,22 @@ func Module() *fluxgo.FluxModule {
 			return &fluxgo.GlobalResponse{Content: resp, Status: 200}, nil
 		})
 	})
-	mod.AddRoute(func(cron *fluxgo.Cron, logger *fluxgo.Logger, handler *handlers.HandlerGetUser) error {
+	mod.AddRoute(func(cron *fluxgo.Cron, kafka *fluxgo.Kafka, logger *fluxgo.Logger, handler *handlers.HandlerGetUser) error {
 		return mod.CronRoute(cron, "* * * * *", func(ctx context.Context) error {
 			logger.Infoln("Cron executed")
 			log.Println("Cron executed")
+
+			if err := kafka.ProduceMessageJson(ctx, "TEST", fiber.Map{"foo": "bar"}, nil); err != nil {
+				log.Println("Error to produce message", err)
+				return err
+			}
+
+			return nil
+		})
+	})
+	mod.AddRoute(func(kafka *fluxgo.Kafka, handler *handlers.HandlerGetUser) error {
+		return mod.KafkaEvent(kafka, "TEST", func(ctx context.Context, data []byte) error {
+			log.Println("Kafka event executed", string(data))
 			return nil
 		})
 	})

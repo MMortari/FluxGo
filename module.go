@@ -101,6 +101,9 @@ func (m *FluxModule) HttpRoute(f *FluxGo, group string, method string, path stri
 func (m *FluxModule) CronRoute(cron *Cron, crontab string, handler CronHandler) error {
 	return cron.Register(crontab, handler)
 }
+func (m *FluxModule) KafkaEvent(kafka *Kafka, topic string, handler KafkaHandler) error {
+	return kafka.AddConsumer(topic, handler)
+}
 
 func (i *RouteIncome) Parse(http *Http, c *fiber.Ctx) (EntityData, *GlobalError) {
 	if i.Entity == nil {
