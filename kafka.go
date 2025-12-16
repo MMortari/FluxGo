@@ -222,15 +222,11 @@ func (h *ConsumerGroup) handleMessage(msg *sarama.ConsumerMessage, session saram
 	poolCtx, span := h.client.apm.StartSpan(context.Background(), fmt.Sprintf("pool %s", msg.Topic), trace.WithSpanKind(trace.SpanKindConsumer))
 	defer span.End()
 
-	consumer := h.getHandler(msg.Topic)
-
-	if consumer != nil {
+	if consumer := h.getHandler(msg.Topic); consumer != nil {
 		ctx, processSpan := h.client.apm.StartSpan(context.Background(), fmt.Sprintf("process %s", msg.Topic), trace.WithSpanKind(trace.SpanKindServer), trace.WithLinks(trace.LinkFromContext(poolCtx)))
 		defer processSpan.End()
 
-		err := consumer.handler(ctx, msg.Value)
-
-		if err == nil {
+		if err := consumer.handler(ctx, msg.Value); err == nil {
 			session.MarkMessage(msg, "")
 		} else {
 			processSpan.SetStatus(codes.Error, err.Error())
