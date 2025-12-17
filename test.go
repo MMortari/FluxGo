@@ -37,7 +37,10 @@ func RunTestRequestRaw(http *Http, method string, route string, reqBody interfac
 		}
 	}
 
-	resp, _ := http.app.Test(req, 10000)
+	resp, err := http.app.Test(req, 10000)
+	if err != nil {
+		fmt.Println(err)
+	}
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
