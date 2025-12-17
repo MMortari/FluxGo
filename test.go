@@ -31,6 +31,11 @@ func RunTestRequestRaw(http *Http, method string, route string, reqBody interfac
 
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Api-Version", "1")
+	if headers != nil {
+		for key, value := range *headers {
+			req.Header.Add(key, value)
+		}
+	}
 
 	resp, _ := http.app.Test(req, 10000)
 
