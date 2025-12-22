@@ -17,7 +17,7 @@ func main() {
 	flux := fluxgo.
 		New(fluxgo.FluxGoConfig{Name: "Migrations"}).
 		AddApm(fluxgo.ApmOptions{CollectorURL: env.Apm.CollectorUrl, Exporter: env.Apm.Exporter}).
-		AddDatabase(fluxgo.DatabaseOptions{Dsn: env.Database.Dsn})
+		AddDatabase(fluxgo.DatabaseOptions{Instances: []fluxgo.DatabaseConn{{Dsn: env.Database.Dsn}}})
 
 	if err := flux.RunMigrations(ctx, fluxgo.DatabaseMigrationsOptions{Dir: "shared/database/migrations"}); err != nil {
 		panic(err)
