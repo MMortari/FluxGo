@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"path"
+	"sync"
 
 	"github.com/golang-migrate/migrate/v4"
 	"github.com/golang-migrate/migrate/v4/database/postgres"
@@ -19,59 +20,91 @@ import (
 	"go.uber.org/multierr"
 )
 
-type Database struct {
+type databaseData struct {
 	primaryDBs []*sqlx.DB
 	replicaDBs []*sqlx.DB
-
-	apm *Apm
 }
-type DatabaseOptions struct {
+
+type Database struct {
+	apm  *Apm
+	once sync.Once
+	mu   sync.Mutex
+
+	dbs           map[string]*databaseData
+	mainPrimaryDB *sqlx.DB
+	mainReplicaDB *sqlx.DB
+}
+type DatabaseConn struct {
 	Dsn  string
 	Type string
 }
+type DatabaseOptions struct {
+	Name      string
+	Instances []DatabaseConn
+}
 
-func (f *FluxGo) AddDatabase(opt ...DatabaseOptions) *FluxGo {
-	f.AddDependency(func(apm *Apm) *Database {
-		database := Database{
-			primaryDBs: []*sqlx.DB{},
-			replicaDBs: []*sqlx.DB{},
-			apm:        apm,
+type dbDependency struct {
+	fx.In
+	Apm *Apm
+	DB  *Database `optional:"true"`
+}
+
+func (f *FluxGo) AddDatabase(data DatabaseOptions) *FluxGo {
+	f.db.mu.Lock()
+	defer f.db.mu.Unlock()
+
+	name := "default"
+	if data.Name != "" {
+		name = data.Name
+	}
+
+	if _, exists := f.db.dbs[name]; exists {
+		log.Fatalf("Database with name %s already exists", name)
+	}
+
+	database := databaseData{
+		primaryDBs: []*sqlx.DB{},
+		replicaDBs: []*sqlx.DB{},
+	}
+
+	for _, item := range data.Instances {
+		db, err := sqlx.Open("postgres", item.Dsn)
+		if err != nil {
+			log.Fatalln("Error to create database client", err)
 		}
 
-		for _, item := range opt {
-			db, err := sqlx.Open("postgres", item.Dsn)
-			if err != nil {
-				log.Fatalln("Error to create database client", err)
-			}
-
-			switch item.Type {
-			case "replica":
-				database.replicaDBs = append(database.replicaDBs, db)
-			default:
-				database.primaryDBs = append(database.primaryDBs, db)
-			}
+		switch item.Type {
+		case "replica":
+			database.replicaDBs = append(database.replicaDBs, db)
+		default:
+			database.primaryDBs = append(database.primaryDBs, db)
 		}
+	}
 
-		return &database
-	})
-	f.AddInvoke(func(lc fx.Lifecycle, db *Database) error {
-		lc.Append(fx.Hook{
-			OnStart: func(ctx context.Context) error {
-				if err := db.Connect(ctx); err != nil {
-					return err
-				}
-				f.log("DATABASE", "Connected")
-				return nil
-			},
-			OnStop: func(ctx context.Context) error {
-				if err := db.Disconnect(); err != nil {
-					return err
-				}
-				f.log("DATABASE", "Disconnected")
-				return nil
-			},
+	f.db.dbs[name] = &database
+
+	f.db.once.Do(func() {
+		f.AddInvoke(func(lc fx.Lifecycle, db *Database) error {
+			f.db.apm = f.apm
+
+			lc.Append(fx.Hook{
+				OnStart: func(ctx context.Context) error {
+					if err := db.Connect(ctx); err != nil {
+						return err
+					}
+					f.log("DATABASE", "Connected")
+					return nil
+				},
+				OnStop: func(ctx context.Context) error {
+					if err := db.Disconnect(); err != nil {
+						return err
+					}
+					f.log("DATABASE", "Disconnected")
+					return nil
+				},
+			})
+			return nil
 		})
-		return nil
 	})
 
 	return f
@@ -79,53 +112,120 @@ func (f *FluxGo) AddDatabase(opt ...DatabaseOptions) *FluxGo {
 
 func (d *Database) Connect(ctx context.Context) error {
 	var err error
-	for _, db := range d.primaryDBs {
-		if e := db.PingContext(ctx); e != nil {
-			err = multierr.Append(err, e)
+
+	for _, dbs := range d.dbs {
+		for _, db := range dbs.primaryDBs {
+			if e := db.PingContext(ctx); e != nil {
+				err = multierr.Append(err, e)
+			}
+		}
+		for _, db := range dbs.replicaDBs {
+			if e := db.PingContext(ctx); e != nil {
+				err = multierr.Append(err, e)
+			}
 		}
 	}
-	for _, db := range d.replicaDBs {
-		if e := db.PingContext(ctx); e != nil {
-			err = multierr.Append(err, e)
-		}
-	}
+
 	return err
 }
 func (d *Database) Disconnect() error {
 	var err error
-	for _, db := range d.primaryDBs {
-		if e := db.Close(); e != nil {
-			err = multierr.Append(err, e)
+
+	for _, dbs := range d.dbs {
+		for _, db := range dbs.primaryDBs {
+			if e := db.Close(); e != nil {
+				err = multierr.Append(err, e)
+			}
+		}
+		for _, db := range dbs.replicaDBs {
+			if e := db.Close(); e != nil {
+				err = multierr.Append(err, e)
+			}
 		}
 	}
-	for _, db := range d.replicaDBs {
-		if e := db.Close(); e != nil {
-			err = multierr.Append(err, e)
-		}
-	}
+
 	return err
 }
-func (d *Database) WriteDB() *sqlx.DB {
-	switch size := len(d.primaryDBs); size {
+
+func (d *Database) WriteDBNamed(name string) *sqlx.DB {
+	db, exists := d.dbs[name]
+	if !exists {
+		panic(fmt.Sprintf("No database configured with name %s", name))
+	}
+
+	switch size := len(db.primaryDBs); size {
 	case 0:
 		panic("No primary database configured")
 	case 1:
-		return d.primaryDBs[0]
+		return db.primaryDBs[0]
 	default:
 		index := GetRandomNumber(size)
-		return d.primaryDBs[index]
+		return db.primaryDBs[index]
+	}
+}
+func (d *Database) WriteDB() *sqlx.DB {
+	if d.mainPrimaryDB != nil {
+		return d.mainPrimaryDB
+	}
+
+	var key string
+
+	switch size := len(d.dbs); size {
+	case 0:
+		panic("No database configured")
+	case 1:
+		for k, _ := range d.dbs {
+			key = k
+		}
+	default:
+		panic("You must use WriteDBNamed when more than one database is configured")
+	}
+
+	db := d.WriteDBNamed(key)
+
+	d.mainPrimaryDB = db
+
+	return db
+}
+func (d *Database) ReadOnlyDBNamed(name string) *sqlx.DB {
+	db, exists := d.dbs[name]
+	if !exists {
+		panic(fmt.Sprintf("No database configured with name %s", name))
+	}
+
+	switch size := len(db.replicaDBs); size {
+	case 0:
+		return d.WriteDBNamed(name)
+	case 1:
+		return db.replicaDBs[0]
+	default:
+		index := GetRandomNumber(size)
+		return db.replicaDBs[index]
 	}
 }
 func (d *Database) ReadOnlyDB() *sqlx.DB {
-	switch size := len(d.replicaDBs); size {
-	case 0:
-		return d.WriteDB()
-	case 1:
-		return d.replicaDBs[0]
-	default:
-		index := GetRandomNumber(size)
-		return d.replicaDBs[index]
+	if d.mainReplicaDB != nil {
+		return d.mainReplicaDB
 	}
+
+	var key string
+
+	switch size := len(d.dbs); size {
+	case 0:
+		panic("No database configured")
+	case 1:
+		for k, _ := range d.dbs {
+			key = k
+		}
+	default:
+		panic("You must use WriteDBNamed when more than one database is configured")
+	}
+
+	db := d.ReadOnlyDBNamed(key)
+
+	d.mainReplicaDB = db
+
+	return db
 }
 
 type DatabaseMigrationsOptions struct {
