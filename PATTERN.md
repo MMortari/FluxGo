@@ -134,8 +134,12 @@ func Module() *fluxgo.FluxGo {
 	// 5. Adição de dependências
 	flux.AddDependency(func() *config.Env { return &env })
 
-	// 6. Configuração de banco de dados
-	flux.AddDatabase(fluxgo.DatabaseOptions{Dsn: env.Database.Dsn})
+	// 6. Configuração de banco de dados (primário simples)
+	flux.AddDatabase(fluxgo.DatabaseOptions{
+		Instances: []fluxgo.DatabaseConn{
+			{Dsn: env.Database.Dsn}, // Type vazio ou diferente de "replica" é tratado como primário
+		},
+	})
 
 	// 7. Configuração de Redis
 	flux.AddRedis(fluxgo.RedisOptions{
@@ -159,6 +163,12 @@ func Module() *fluxgo.FluxGo {
 ```
 
 **Padrão**: Configuração centralizada de todos os serviços e dependências.
+
+- **Banco de dados**:
+  - Uso de `DatabaseOptions{Instances: []DatabaseConn{...}}`
+  - Cada item de `Instances` representa uma conexão de banco
+  - `Type: "replica"` indica banco de leitura; ausência desse valor indica banco primário
+  - Métodos de acesso: `WriteDB()/WriteDBNamed()` para escrita e `ReadOnlyDB()/ReadOnlyDBNamed()` para leitura
 
 ---
 
@@ -493,9 +503,13 @@ func main() {
 		New(fluxgo.FluxGoConfig{Name: "Migrations"}).
 		AddApm(fluxgo.ApmOptions{
 			CollectorURL: env.Apm.CollectorUrl,
-			Exporter: env.Apm.Exporter,
+			Exporter:     env.Apm.Exporter,
 		}).
-		AddDatabase(fluxgo.DatabaseOptions{Dsn: env.Database.Dsn})
+		AddDatabase(fluxgo.DatabaseOptions{
+			Instances: []fluxgo.DatabaseConn{
+				{Dsn: env.Database.Dsn},
+			},
+		})
 
 	if err := flux.RunMigrations(ctx, fluxgo.DatabaseMigrationsOptions{
 		Dir: "shared/database/migrations",
@@ -519,6 +533,7 @@ func main() {
 - Context com timeout
 - Execução de migrações com `RunMigrations()`
 - Execução de seeds com `RunSeeds()`
+- Reutiliza a mesma configuração de banco de dados do módulo principal (`DatabaseOptions{Instances: []DatabaseConn{...}}`)
 
 ---
 
