@@ -609,7 +609,62 @@ func TestOnboardContact(t *testing.T) {
 
 ---
 
-### 13. Makefile
+### 13. Docker Compose (`docker-compose.yml`)
+
+```yaml
+version: "3.8"
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+      - "4317:4317"
+    environment:
+      - LOG_LEVEL=debug
+
+  database:
+    image: postgres:16
+    container_name: database
+    ports:
+      - 5435:5432
+    environment:
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=flux
+
+  redis:
+    container_name: redis
+    image: redis:7.4-alpine
+    restart: always
+    ports:
+      - 6398:6379
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+```
+
+**Padrão**:
+
+- **Jaeger (APM/Tracing)**:
+  - Inclua o serviço `jaeger` quando o projeto usar APM via OTEL (`AddApm`).
+  - Exponha as portas `16686` (UI) e `4317`/`4318` (OTLP).
+  - Ajuste `CollectorURL` nas envs para apontar para o Jaeger do compose.
+- **Database (Postgres)**:
+  - Use o serviço `database` quando o projeto depender de banco relacional.
+  - Mapeie a porta externa conforme necessidade (ex.: `5435:5432`) e mantenha as envs compatíveis com `DATABASE_DSN`.
+  - No `DATABASE_DSN`, aponte o host para `database` (nome do serviço).
+  - Para múltiplas instâncias/replicas, crie novos serviços (ex.: `database_replica`) e ajuste `DatabaseOptions.Instances`.
+- **Redis**:
+  - Inclua o serviço `redis` apenas se a aplicação usar cache/filas com Redis (`AddRedis`).
+  - Mapeie a porta externa conforme necessidade (ex.: `6398:6379`) e mantenha as envs compatíveis com `REDIS_ADDR`.
+  - No `REDIS_ADDR`, aponte o host para `redis`.
+- **Customização por serviço**:
+  - Remova serviços não utilizados (ex.: sem Redis, remova o bloco `redis`).
+  - Adicione novos serviços de infraestrutura conforme a necessidade do domínio (ex.: filas, storage) e exponha via variáveis de ambiente tipadas na `config.Env`.
+  - Mantenha a assinatura de envs consistente com o que o módulo principal espera (por exemplo, `DATABASE_DSN`, `REDIS_ADDR`, `APM_COLLECTOR_URL`).
+
+---
+
+### 14. Makefile
 
 ```makefile
 run:
@@ -631,7 +686,7 @@ migrations:
 
 ---
 
-### 14. API HTTP (`api.http`)
+### 15. API HTTP (`api.http`)
 
 ```http
 GET http://localhost:3333/public/user
