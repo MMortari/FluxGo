@@ -17,6 +17,7 @@ type FluxGo struct {
 	logger *Logger
 	apm    *Apm
 	http   *Http
+	db     *Database
 
 	dependencies []fx.Option
 	invokes      []fx.Option
@@ -47,6 +48,9 @@ func New(config FluxGoConfig) *FluxGo {
 
 	init.dependencies = append(init.dependencies, fx.Provide(func() *FluxGo { return &init }))
 	init.dependencies = append(init.dependencies, fx.Provide(func() *Logger { return init.logger }))
+
+	init.db = &Database{dbs: make(map[string]*databaseData)}
+	init.dependencies = append(init.dependencies, fx.Provide(func() *Database { return init.db }))
 
 	return &init
 }

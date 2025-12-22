@@ -17,7 +17,7 @@ func Module() *fluxgo.FluxGo {
 	flux.ConfigLogger(fluxgo.LoggerOptions{Type: env.Logger.Type, Level: env.Logger.Level, LogFilePath: env.Logger.FilePath})
 
 	flux.AddDependency(func() *config.Env { return &env })
-	flux.AddDatabase(fluxgo.DatabaseOptions{Dsn: env.Database.Dsn})
+	flux.AddDatabase(fluxgo.DatabaseOptions{Instances: []fluxgo.DatabaseConn{{Dsn: env.Database.Dsn}}})
 	flux.AddRedis(fluxgo.RedisOptions{Options: redis.Options{Addr: env.Redis.Addr}})
 	flux.AddCron()
 	flux.AddHttp(http.GetHttp(flux.GetApm()))
