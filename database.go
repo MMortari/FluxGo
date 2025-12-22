@@ -212,7 +212,7 @@ func (d *Database) ReadOnlyDB() *sqlx.DB {
 			key = k
 		}
 	default:
-		panic("You must use WriteDBNamed when more than one database is configured")
+		panic("You must use ReadOnlyDBNamed when more than one database is configured")
 	}
 
 	db := d.ReadOnlyDBNamed(key)
