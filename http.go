@@ -63,9 +63,10 @@ type Http struct {
 }
 
 type HttpOptions struct {
-	Port       int
-	ConfigApp  func(*fiber.App)
-	LogRequest bool
+	Port            int
+	ConfigApp       func(*fiber.App)
+	LogRequest      bool
+	AddHealthRoutes bool
 
 	FiberConfig fiber.Config
 	Apm         *Apm
@@ -88,6 +89,17 @@ func NewHttp(opt HttpOptions) *Http {
 		app.Use(logger.New(logger.Config{
 			Format: "${time} ${status} - ${method} ${path} ${latency}\n",
 		}))
+	}
+	if opt.AddHealthRoutes {
+		app.Get("/live", func(c *fiber.Ctx) error {
+			return c.SendStatus(fiber.StatusOK)
+		})
+		app.Get("/health", func(c *fiber.Ctx) error {
+			return c.SendStatus(fiber.StatusOK)
+		})
+		app.Get("/readyz", func(c *fiber.Ctx) error {
+			return c.SendStatus(fiber.StatusOK)
+		})
 	}
 
 	http := &Http{app: app, port: opt.Port, routers: make(map[string]*fiber.Router)}
