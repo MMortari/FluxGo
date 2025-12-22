@@ -43,12 +43,6 @@ type DatabaseOptions struct {
 	Instances []DatabaseConn
 }
 
-type dbDependency struct {
-	fx.In
-	Apm *Apm
-	DB  *Database `optional:"true"`
-}
-
 func (f *FluxGo) AddDatabase(data DatabaseOptions) *FluxGo {
 	f.db.mu.Lock()
 	defer f.db.mu.Unlock()
@@ -174,7 +168,7 @@ func (d *Database) WriteDB() *sqlx.DB {
 	case 0:
 		panic("No database configured")
 	case 1:
-		for k, _ := range d.dbs {
+		for k := range d.dbs {
 			key = k
 		}
 	default:
@@ -214,7 +208,7 @@ func (d *Database) ReadOnlyDB() *sqlx.DB {
 	case 0:
 		panic("No database configured")
 	case 1:
-		for k, _ := range d.dbs {
+		for k := range d.dbs {
 			key = k
 		}
 	default:
