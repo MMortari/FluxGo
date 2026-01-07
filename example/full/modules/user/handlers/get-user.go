@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	c "context"
 	"encoding/json"
 	"errors"
@@ -40,7 +39,7 @@ func (h *HandlerGetUser) Description() string {
 func (h *HandlerGetUser) Schema() fluxgo.ToolsSchema {
 	return fluxgo.ToolParseSchema(dto.GetUserReq{})
 }
-func (h *HandlerGetUser) ExecuteTool(ctx context.Context, raw json.RawMessage) (any, error) {
+func (h *HandlerGetUser) ExecuteTool(ctx c.Context, raw json.RawMessage) (any, error) {
 	resp := &dto.GetUserReq{}
 	if err := json.Unmarshal(raw, resp); err != nil {
 		return nil, err

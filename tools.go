@@ -43,8 +43,7 @@ func (f *Tools) AddTool(tool ToolsInterface) {
 func (f *Tools) GetOllamaTools() ([]byte, error) {
 	provider := "ollama"
 
-	found, ok := f.toolsJson[provider]
-	if ok {
+	if found, ok := f.toolsJson[provider]; ok {
 		return found, nil
 	}
 
