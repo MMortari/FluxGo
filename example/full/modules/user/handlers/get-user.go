@@ -4,6 +4,7 @@ import (
 	c "context"
 	"encoding/json"
 	"errors"
+	"fmt"
 
 	fluxgo "github.com/MMortari/FluxGo"
 	"github.com/MMortari/FluxGo/example/full/modules/user/dto"
@@ -20,10 +21,12 @@ func HandlerGetUserStart(repository *repositories.UserRepository, tools *fluxgo.
 }
 
 func (h *HandlerGetUser) Execute(ctx c.Context, data *dto.GetUserReq) (*dto.GetUserRes, *fluxgo.GlobalError) {
-	_, err := h.tools.GetOllamaTools()
+	tool, err := h.tools.GetOllamaTools()
 	if err != nil {
 		return nil, fluxgo.ErrorInternalError("Error to get ollama tools")
 	}
+
+	fmt.Printf("tool: %+v\n\n", tool)
 
 	user, err := h.repository.GetUser(ctx)
 	if err != nil {
