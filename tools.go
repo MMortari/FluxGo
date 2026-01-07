@@ -30,9 +30,13 @@ type ToolDefinition struct {
 	Schema      ToolsSchema
 }
 
+func ToolsStart(apm *Apm) *Tools {
+	return &Tools{apm, make(map[string]ToolsInterface), make(ToolsJson)}
+}
+
 func (f *FluxGo) AddTools() *FluxGo {
 	f.AddDependency(func(apm *Apm) *Tools {
-		return &Tools{apm, make(map[string]ToolsInterface), make(ToolsJson)}
+		return ToolsStart(apm)
 	})
 
 	return f
