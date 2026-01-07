@@ -10,7 +10,7 @@ import (
 type Tools struct {
 	apm *Apm
 
-	tools     []ToolsInterface
+	tools     map[string]ToolsInterface
 	toolsJson ToolsJson
 }
 
@@ -32,13 +32,20 @@ type ToolDefinition struct {
 
 func (f *FluxGo) AddTools() *FluxGo {
 	f.AddDependency(func(apm *Apm) *Tools {
-		return &Tools{apm, make([]ToolsInterface, 0), make(ToolsJson)}
+		return &Tools{apm, make(map[string]ToolsInterface), make(ToolsJson)}
 	})
 
 	return f
 }
 func (f *Tools) AddTool(tool ToolsInterface) {
-	f.tools = append(f.tools, tool)
+	f.tools[tool.Name()] = tool
+}
+func (f *Tools) GetTool(name string) *ToolsInterface {
+	tool, ok := f.tools[name]
+	if !ok {
+		return nil
+	}
+	return &tool
 }
 func (f *Tools) GetOllamaTools() ([]byte, error) {
 	provider := "ollama"
