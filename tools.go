@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/invopop/jsonschema"
+	"github.com/ollama/ollama/api"
 )
 
 type Tools struct {
@@ -14,7 +15,7 @@ type Tools struct {
 	toolsJson ToolsJson
 }
 
-type ToolsJson map[string][]byte
+type ToolsJson map[string]any
 
 type ToolsSchema *jsonschema.Schema
 
@@ -44,41 +45,46 @@ func (f *FluxGo) AddTools() *FluxGo {
 func (f *Tools) AddTool(tool ToolsInterface) {
 	f.tools[tool.Name()] = tool
 }
-func (f *Tools) GetTool(name string) *ToolsInterface {
+func (f *Tools) GetTool(name string) ToolsInterface {
 	tool, ok := f.tools[name]
 	if !ok {
 		return nil
 	}
-	return &tool
+	return tool
 }
-func (f *Tools) GetOllamaTools() ([]byte, error) {
+func (f *Tools) GetOllamaTools() (api.Tools, error) {
 	provider := "ollama"
 
 	if found, ok := f.toolsJson[provider]; ok {
-		return found, nil
+		return found.(api.Tools), nil
 	}
 
-	defs := make([]map[string]any, 0, len(f.tools))
+	defs := make(api.Tools, 0, len(f.tools))
 
 	for _, tool := range f.tools {
-		defs = append(defs, map[string]any{
-			"type": "function",
-			"function": map[string]any{
-				"name":        tool.Name(),
-				"description": tool.Description(),
-				"parameters":  tool.Schema(),
+		jsonMarshal, err := json.Marshal(tool.Schema())
+		if err != nil {
+			return nil, err
+		}
+
+		parameters := api.ToolFunctionParameters{}
+		if err := json.Unmarshal(jsonMarshal, &parameters); err != nil {
+			return nil, err
+		}
+
+		defs = append(defs, api.Tool{
+			Type: "function",
+			Function: api.ToolFunction{
+				Name:        tool.Name(),
+				Description: tool.Description(),
+				Parameters:  parameters,
 			},
 		})
 	}
 
-	toolsJson, err := json.Marshal(defs)
-	if err != nil {
-		return nil, err
-	}
+	f.toolsJson[provider] = defs
 
-	f.toolsJson[provider] = toolsJson
-
-	return toolsJson, nil
+	return defs, nil
 }
 
 func ToolParseSchema(i any) ToolsSchema {
