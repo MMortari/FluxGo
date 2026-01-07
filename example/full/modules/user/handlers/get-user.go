@@ -20,6 +20,11 @@ func HandlerGetUserStart(repository *repositories.UserRepository, tools *fluxgo.
 }
 
 func (h *HandlerGetUser) Execute(ctx c.Context, data *dto.GetUserReq) (*dto.GetUserRes, *fluxgo.GlobalError) {
+	_, err := h.tools.GetOllamaTools()
+	if err != nil {
+		return nil, fluxgo.ErrorInternalError("Error to get ollama tools")
+	}
+
 	user, err := h.repository.GetUser(ctx)
 	if err != nil {
 		return nil, fluxgo.ErrorInternalError("Error to get user")
@@ -39,7 +44,7 @@ func (h *HandlerGetUser) Description() string {
 func (h *HandlerGetUser) Schema() fluxgo.ToolsSchema {
 	return fluxgo.ToolParseSchema(dto.GetUserReq{})
 }
-func (h *HandlerGetUser) ExecuteTool(ctx c.Context, raw json.RawMessage) (any, error) {
+func (h *HandlerGetUser) ExecuteTool(ctx c.Context, raw json.RawMessage) (json.RawMessage, error) {
 	resp := &dto.GetUserReq{}
 	if err := json.Unmarshal(raw, resp); err != nil {
 		return nil, err
@@ -50,5 +55,5 @@ func (h *HandlerGetUser) ExecuteTool(ctx c.Context, raw json.RawMessage) (any, e
 		return nil, errors.New(err.Message)
 	}
 
-	return res, nil
+	return json.Marshal(res)
 }

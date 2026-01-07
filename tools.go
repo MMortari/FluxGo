@@ -23,7 +23,7 @@ type ToolsInterface interface {
 	Name() string
 	Description() string
 	Schema() ToolsSchema
-	ExecuteTool(ctx context.Context, raw json.RawMessage) (any, error)
+	ExecuteTool(ctx context.Context, raw json.RawMessage) (json.RawMessage, error)
 }
 type ToolDefinition struct {
 	Name        string
