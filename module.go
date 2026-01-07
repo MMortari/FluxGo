@@ -101,6 +101,10 @@ func (m *FluxModule) HttpRoute(f *FluxGo, group string, method string, path stri
 func (m *FluxModule) CronRoute(cron *Cron, crontab string, handler CronHandler) error {
 	return cron.Register(crontab, handler)
 }
+func (m *FluxModule) ToolRoute(f *FluxGo, tools *Tools, handler ToolsInterface) error {
+	tools.AddTool(handler)
+	return nil
+}
 
 func (i *RouteIncome) Parse(http *Http, c *fiber.Ctx) (EntityData, *GlobalError) {
 	if i.Entity == nil {
