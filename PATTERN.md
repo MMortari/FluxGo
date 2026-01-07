@@ -709,6 +709,50 @@ content-type: application/json
 
 ---
 
+16. Tools
+
+O projeto inclui um componente `Tools` para registro e exposição de ferramentas programáticas.
+
+- **Visão geral**: Um container que mantém ferramentas que implementam `ToolsInterface` e provê utilitários como `GetOllamaTools()` para gerar definições JSON compatíveis com provedores (ex: `ollama`).
+- **Interface mínima**:
+  - `Name() string`
+  - `Description() string`
+  - `Schema() ToolsSchema` (schema JSON das entradas)
+  - `ExecuteTool(ctx context.Context, raw json.RawMessage) (any, error)`
+- **Como usar**:
+
+  1.  Habilite o container no `Module()` chamando `flux.AddTools()`.
+  2.  Registre suas tools via dependência para receber o `*fluxgo.Tools` e chamar `AddTool()`.
+
+```go
+flux.AddTools()
+
+flux.AddDependency(func(tools *fluxgo.Tools) error {
+		tools.AddTool(&MyTool{})
+		return nil
+})
+```
+
+- **Schema / integração**: use `ToolParseSchema()` para gerar `ToolsSchema` a partir de structs de parâmetros. `GetOllamaTools()` retorna o JSON com as definições prontas para envio ao provedor `ollama`.
+
+Exemplo resumido:
+
+```go
+type MyToolParams struct { Query string `json:"query"` }
+
+type MyTool struct{}
+func (t *MyTool) Name() string { return "my_tool" }
+func (t *MyTool) Description() string { return "Busca algo" }
+func (t *MyTool) Schema() ToolsSchema { return ToolParseSchema(MyToolParams{}) }
+func (t *MyTool) ExecuteTool(ctx context.Context, raw json.RawMessage) (any, error) { return nil, nil }
+```
+
+**Padrões**:
+
+- Registrar `Tools` no início da inicialização do módulo.
+- Fornecer schemas para validação/integração com provedores de funções.
+- Usar `GetOllamaTools()` para integração com provedores que esperam definições de funções.
+
 ## 🔄 Fluxo de Dados
 
 ```
