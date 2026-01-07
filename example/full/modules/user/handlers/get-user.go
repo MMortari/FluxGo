@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"context"
 	c "context"
+	"encoding/json"
+	"errors"
 
 	fluxgo "github.com/MMortari/FluxGo"
 	"github.com/MMortari/FluxGo/example/full/modules/user/dto"
@@ -10,13 +13,14 @@ import (
 
 type HandlerGetUser struct {
 	repository *repositories.UserRepository
+	tools      *fluxgo.Tools
 }
 
-func HandlerGetUserStart(repository *repositories.UserRepository) *HandlerGetUser {
-	return &HandlerGetUser{repository: repository}
+func HandlerGetUserStart(repository *repositories.UserRepository, tools *fluxgo.Tools) *HandlerGetUser {
+	return &HandlerGetUser{repository, tools}
 }
 
-func (h *HandlerGetUser) Execute(ctx c.Context, idUser string) (*dto.GetUserRes, *fluxgo.GlobalError) {
+func (h *HandlerGetUser) Execute(ctx c.Context, data *dto.GetUserReq) (*dto.GetUserRes, *fluxgo.GlobalError) {
 	user, err := h.repository.GetUser(ctx)
 	if err != nil {
 		return nil, fluxgo.ErrorInternalError("Error to get user")
@@ -25,4 +29,27 @@ func (h *HandlerGetUser) Execute(ctx c.Context, idUser string) (*dto.GetUserRes,
 		return nil, fluxgo.ErrorNotFound("User not found")
 	}
 	return &dto.GetUserRes{User: *user}, nil
+}
+
+func (h *HandlerGetUser) Name() string {
+	return "HandlerGetUser"
+}
+func (h *HandlerGetUser) Description() string {
+	return "Tool to get user information"
+}
+func (h *HandlerGetUser) Schema() fluxgo.ToolsSchema {
+	return fluxgo.ToolParseSchema(dto.GetUserReq{})
+}
+func (h *HandlerGetUser) ExecuteTool(ctx context.Context, raw json.RawMessage) (any, error) {
+	resp := &dto.GetUserReq{}
+	if err := json.Unmarshal(raw, resp); err != nil {
+		return nil, err
+	}
+
+	res, err := h.Execute(ctx, resp)
+	if err != nil {
+		return nil, errors.New(err.Message)
+	}
+
+	return res, nil
 }

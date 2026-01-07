@@ -12,7 +12,7 @@ import (
 func Module() *fluxgo.FluxGo {
 	env := fluxgo.ParseEnv[config.Env](fluxgo.EnvOptions{LoadFromFile: fluxgo.Pointer(".env.development"), Validate: true})
 
-	flux := fluxgo.New(fluxgo.FluxGoConfig{Name: "Teste Full", Version: "1", Env: &env.Env, Debugger: true})
+	flux := fluxgo.New(fluxgo.FluxGoConfig{Name: "Teste Full", Version: "1", Env: &env.Env, Debugger: true, FullDebugger: true})
 	flux.AddApm(fluxgo.ApmOptions{CollectorURL: env.Apm.CollectorUrl, Exporter: env.Apm.Exporter})
 	flux.ConfigLogger(fluxgo.LoggerOptions{Type: env.Logger.Type, Level: env.Logger.Level, LogFilePath: env.Logger.FilePath})
 
@@ -21,6 +21,7 @@ func Module() *fluxgo.FluxGo {
 	flux.AddRedis(fluxgo.RedisOptions{Options: redis.Options{Addr: env.Redis.Addr}})
 	flux.AddCron()
 	flux.AddHttp(http.GetHttp(flux.GetApm()))
+	flux.AddTools()
 
 	flux.AddDependency(repositories.UserRepositoryStart)
 
