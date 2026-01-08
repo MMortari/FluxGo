@@ -225,6 +225,7 @@ func (d *Database) ReadOnlyDB() *sqlx.DB {
 type DatabaseMigrationsOptions struct {
 	Dir    string
 	Config *postgres.Config
+	Seeds  *string
 }
 
 func (f *FluxGo) RunMigrations(ctx context.Context, opt DatabaseMigrationsOptions) error {
@@ -273,24 +274,15 @@ func (f *FluxGo) RunMigrations(ctx context.Context, opt DatabaseMigrationsOption
 
 				log.Println("Migrations done!")
 
-				return nil
-			},
-		})
-	}), fx.NopLogger)
+				if opt.Seeds != nil {
+					log.Println("Starting seeds...")
 
-	return fx.New(opts...).Start(ctx)
-}
-func (f *FluxGo) RunSeeds(ctx context.Context, query string) error {
-	opts := append(f.GetFxConfig(), fx.Invoke(func(lc fx.Lifecycle, db *Database) {
-		lc.Append(fx.Hook{
-			OnStart: func(ctx context.Context) error {
-				log.Println("Starting seeds...")
+					if _, err := db.WriteDB().ExecContext(ctx, *opt.Seeds); err != nil {
+						return fmt.Errorf("unable to apply seeds: %v", err)
+					}
 
-				if _, err := db.WriteDB().ExecContext(ctx, query); err != nil {
-					return fmt.Errorf("unable to apply seeds: %v", err)
+					log.Println("Seeds done!")
 				}
-
-				log.Println("Seeds done!")
 
 				return nil
 			},

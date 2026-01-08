@@ -19,15 +19,11 @@ func main() {
 		AddApm(fluxgo.ApmOptions{CollectorURL: env.Apm.CollectorUrl, Exporter: env.Apm.Exporter}).
 		AddDatabase(fluxgo.DatabaseOptions{Instances: []fluxgo.DatabaseConn{{Dsn: env.Database.Dsn}}})
 
-	if err := flux.RunMigrations(ctx, fluxgo.DatabaseMigrationsOptions{Dir: "shared/database/migrations"}); err != nil {
-		panic(err)
-	}
-
 	seeds := `
 		INSERT INTO "user" (name) VALUES ('John Doe');
 	`
 
-	if err := flux.RunSeeds(ctx, seeds); err != nil {
+	if err := flux.RunMigrations(ctx, fluxgo.DatabaseMigrationsOptions{Dir: "shared/database/migrations", Seeds: &seeds}); err != nil {
 		panic(err)
 	}
 }
