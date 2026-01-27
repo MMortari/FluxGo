@@ -22,6 +22,7 @@ type FluxGo struct {
 	dependencies []fx.Option
 	invokes      []fx.Option
 	replaces     []fx.Option
+	supplies     []fx.Option
 	modules      []*FluxModule
 }
 type FluxGoConfig struct {
@@ -39,6 +40,7 @@ func New(config FluxGoConfig) *FluxGo {
 		dependencies: []fx.Option{},
 		invokes:      []fx.Option{},
 		replaces:     []fx.Option{},
+		supplies:     []fx.Option{},
 	}
 
 	if init.Env == nil {
@@ -82,6 +84,12 @@ func (f *FluxGo) AddReplace(constructors ...interface{}) *FluxGo {
 
 	return f
 }
+func (f *FluxGo) AddSupply(constructors ...interface{}) *FluxGo {
+	opt := fx.Supply(constructors...)
+	f.supplies = append(f.supplies, opt)
+
+	return f
+}
 
 func (f *FluxGo) AddModule(mod *FluxModule) *FluxGo {
 	f.modules = append(f.modules, mod)
@@ -97,6 +105,7 @@ func (f *FluxGo) GetFxConfig() []fx.Option {
 	}
 	full = append(full, modules...)
 	full = append(full, f.replaces...)
+	full = append(full, f.supplies...)
 
 	if !f.FullDebugger {
 		full = append(full, fx.NopLogger)
