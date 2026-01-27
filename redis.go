@@ -95,6 +95,17 @@ func (r *Redis) Store(ctx context.Context, key string, value interface{}, ttl ti
 
 	return nil
 }
+func (r *Redis) StoreString(ctx context.Context, key string, value string, ttl time.Duration) error {
+	ctx, span := r.apm.StartSpan(ctx, "redis/storeString", SetAttributes(attribute.String("key", key)))
+	defer span.End()
+
+	if err := r.client.Set(ctx, key, value, ttl).Err(); err != nil {
+		span.SetError(err)
+		return err
+	}
+
+	return nil
+}
 func (r *Redis) Invalidate(ctx context.Context, keys []string) error {
 	ctx, span := r.apm.StartSpan(ctx, "redis/invalidate", SetAttributes(attribute.StringSlice("key", keys)))
 	defer span.End()
