@@ -99,13 +99,14 @@ func (f *FluxGo) AddModule(mod *FluxModule) *FluxGo {
 
 func (f *FluxGo) GetFxConfig() []fx.Option {
 	full := append(f.dependencies, f.invokes...)
+	full = append(full, f.replaces...)
+	full = append(full, f.supplies...)
+
 	modules := []fx.Option{}
 	for _, module := range f.modules {
 		modules = append(modules, module.toFx())
 	}
 	full = append(full, modules...)
-	full = append(full, f.replaces...)
-	full = append(full, f.supplies...)
 
 	if !f.FullDebugger {
 		full = append(full, fx.NopLogger)
