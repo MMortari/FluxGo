@@ -19,4 +19,5 @@ type Env struct {
 		Exporter     string `env:"APM_EXPORTER" validate:"required"`
 		CollectorUrl string `env:"APM_COLLECTOR_URL" validate:"required"`
 	}
+	Kafka Kafka
 }

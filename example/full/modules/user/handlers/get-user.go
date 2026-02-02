@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 
 	fluxgo "github.com/MMortari/FluxGo"
 	"github.com/MMortari/FluxGo/example/full/modules/user/dto"
@@ -59,4 +60,9 @@ func (h *HandlerGetUser) ExecuteTool(ctx c.Context, raw json.RawMessage) (json.R
 	}
 
 	return json.Marshal(res)
+}
+
+func (h *HandlerGetUser) HandleMessage(ctx c.Context, data []byte) error {
+	log.Println("New message on event: " + string(data))
+	return nil
 }

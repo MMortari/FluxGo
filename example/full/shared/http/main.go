@@ -7,7 +7,9 @@ import (
 
 func GetHttp(apm *fluxgo.Apm) *fluxgo.Http {
 	http := fluxgo.NewHttp(fluxgo.HttpOptions{Port: 3333, LogRequest: true, Apm: apm})
+
 	http.CreateRouter("/public", middlewareExample(apm))
+	http.CreateRouter("/internal", middlewareExample(apm))
 
 	return http
 }

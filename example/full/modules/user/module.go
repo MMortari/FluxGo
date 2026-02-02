@@ -43,7 +43,7 @@ func Module() *fluxgo.FluxModule {
 		})
 	})
 	mod.AddRoute(func(f *fluxgo.FluxGo, redis *fluxgo.Redis, handler *handlers.HandlerGetUser) error {
-		return mod.HttpRoute(f, "/public", "POST", "/refresh", fluxgo.RouteIncome{
+		return mod.HttpRoute(f, "/internal", "POST", "/refresh", fluxgo.RouteIncome{
 			Entity:          dto.GetUserReq{},
 			Cache:           redis,
 			CacheInvalidate: []string{"/public/user"},
@@ -55,15 +55,24 @@ func Module() *fluxgo.FluxModule {
 			return &fluxgo.GlobalResponse{Content: resp, Status: 200}, nil
 		})
 	})
-	mod.AddRoute(func(cron *fluxgo.Cron, logger *fluxgo.Logger, handler *handlers.HandlerGetUser) error {
+	mod.AddRoute(func(cron *fluxgo.Cron, logger *fluxgo.Logger, kafka *fluxgo.Kafka, handler *handlers.HandlerGetUser) error {
 		return mod.CronRoute(cron, "* * * * *", func(ctx context.Context) error {
 			logger.Infoln("Cron executed")
 			log.Println("Cron executed")
-			return nil
+
+			content := map[string]interface{}{
+				"message": "Hello, Kafka!",
+				"time":    time.Now().UnixNano(),
+			}
+
+			return kafka.ProduceMessageJson(ctx, "TEST", content, nil)
 		})
 	})
 	mod.AddRoute(func(f *fluxgo.FluxGo, tool *fluxgo.Tools, handler *handlers.HandlerGetUser) error {
 		return mod.ToolRoute(f, tool, handler)
+	})
+	mod.AddRoute(func(f *fluxgo.FluxGo, kafka *fluxgo.Kafka, handler *handlers.HandlerGetUser) error {
+		return mod.TopicConsume(kafka, "TEST", handler.HandleMessage)
 	})
 
 	return mod
