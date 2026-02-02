@@ -90,13 +90,14 @@ func (m *FluxModule) HttpRoute(f *FluxGo, group string, method string, path stri
 
 	if r == nil {
 		http.app.Add(method, fmt.Sprintf("%s%s", group, path), fun)
-
-		return nil
+	} else {
+		(*r).Add(method, path, fun)
 	}
 
-	(*r).Add(method, path, fun)
-
 	return nil
+}
+func (m *FluxModule) TopicConsume(kafka *Kafka, topic string, handler MessageHandler) error {
+	return kafka.AddConsumer(topic, handler)
 }
 func (m *FluxModule) CronRoute(cron *Cron, crontab string, handler CronHandler) error {
 	return cron.Register(crontab, handler)

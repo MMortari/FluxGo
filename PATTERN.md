@@ -46,19 +46,16 @@ project/
 ### Camadas da Aplicação
 
 1. **Handlers** (`modules/{module}/handlers/`)
-
    - Recebem requisições HTTP
    - Orquestram a lógica de negócio
    - Retornam DTOs ou erros globais
 
 2. **DTOs** (`modules/{module}/dto/`)
-
    - Objetos de transferência de dados
    - Estruturas de resposta/requisição
    - Serialização JSON
 
 3. **Repositories** (`shared/repositories/`)
-
    - Acesso a dados
    - Queries SQL
    - Abstração do banco de dados
@@ -709,7 +706,7 @@ content-type: application/json
 
 ---
 
-16. Tools
+### 16. Tools
 
 O projeto inclui um componente `Tools` para registro e exposição de ferramentas programáticas.
 
@@ -720,7 +717,6 @@ O projeto inclui um componente `Tools` para registro e exposição de ferramenta
   - `Schema() ToolsSchema` (schema JSON das entradas)
   - `ExecuteTool(ctx context.Context, raw json.RawMessage) (any, error)`
 - **Como usar**:
-
   1.  Habilite o container no `Module()` chamando `flux.AddTools()`.
   2.  Registre suas tools via dependência para receber o `*fluxgo.Tools` e chamar `AddTool()`.
 
@@ -752,6 +748,82 @@ func (t *MyTool) ExecuteTool(ctx context.Context, raw json.RawMessage) (any, err
 - Registrar `Tools` no início da inicialização do módulo.
 - Fornecer schemas para validação/integração com provedores de funções.
 - Usar `GetOllamaTools()` para integração com provedores que esperam definições de funções.
+
+### 17. Configuração e Uso do Kafka
+
+### 1. Variáveis de Ambiente
+
+Adicione as variáveis necessárias no seu arquivo de ambiente:
+
+```env
+KAFKA_BROKERS=localhost:9092
+KAFKA_GROUP_ID=fluxgo-group
+KAFKA_TLS_ENABLED=false
+```
+
+### 2. Estrutura de Configuração
+
+No seu struct de env (exemplo em `config/env.go`):
+
+```go
+Kafka struct {
+	Brokers    []string `env:"KAFKA_BROKERS" envSeparator:"," validate:"required"`
+	GroupId    string   `env:"KAFKA_GROUP_ID" validate:"required"`
+	TlsEnabled bool     `env:"KAFKA_TLS_ENABLED"`
+}
+```
+
+### 3. Registro do Kafka no Módulo Principal
+
+No `shared/module/main.go`:
+
+```go
+flux.AddKafka(fluxgo.KafkaOptions{
+	Brokers: env.Kafka.Brokers,
+	Auth: fluxgo.KafkaAuth{
+		TlsEnabled: env.Kafka.TlsEnabled,
+	},
+	Consumer: &fluxgo.KafkaConsumerOptions{
+		GroupId:    env.Kafka.GroupId,
+		AutoCommit: true,
+	},
+	Producer: &fluxgo.KafkaProducerOptions{
+		Acks: sarama.WaitForAll,
+	},
+})
+```
+
+### 4. Produção de Mensagens
+
+Para publicar mensagens em um tópico:
+
+```go
+err := kafka.ProduceMessageJson(ctx, "TOPICO", map[string]interface{}{
+	"foo": "bar",
+}, nil)
+```
+
+### 5. Consumo de Mensagens
+
+No seu módulo, registre o consumer:
+
+```go
+mod.AddRoute(func(f *fluxgo.FluxGo, kafka *fluxgo.Kafka) error {
+	return mod.TopicConsume(kafka, "TOPICO", func(ctx context.Context, data []byte) error {
+		// Processa a mensagem
+		return nil
+	})
+})
+```
+
+### 6. Observações
+
+- O consumer é gerenciado automaticamente pelo ciclo de vida do FluxGo (start/stop).
+- O handler recebe o contexto e o payload da mensagem.
+- Para múltiplos tópicos, chame `TopicConsume` para cada um.
+- O producer pode ser usado em qualquer handler ou cron.
+
+---
 
 ## 🔄 Fluxo de Dados
 
