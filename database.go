@@ -321,3 +321,32 @@ func (o *Repository[T]) StartSpan(ctx context.Context, opts ...trace.SpanStartOp
 	opts = append(opts, trace.WithAttributes(attribute.String("db.system", "postgresql")))
 	return o.DB.StartSpan(ctx, fmt.Sprintf("repository/%s/%s", o.TableName, FunctionCaller(2)), opts...)
 }
+
+func (o *Database) RunTransaction(pCtx context.Context, handler func(ctx context.Context, tx *sqlx.Tx) error) error {
+	ctx, span := o.apm.StartSpan(pCtx, "repositories/transaction")
+	defer span.End()
+
+	tx, err := o.ReadOnlyDB().BeginTxx(pCtx, nil)
+	if err != nil {
+		span.SetError(err)
+		return err
+	}
+
+	if err := handler(ctx, tx); err != nil {
+		span.SetError(err)
+
+		if err := tx.Rollback(); err != nil {
+			span.SetError(err)
+			return err
+		}
+
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		span.SetError(err)
+		return err
+	}
+
+	return nil
+}
