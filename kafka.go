@@ -180,7 +180,7 @@ func (k *Kafka) ProduceMessage(ctx context.Context, topic string, data sarama.En
 		spanAtt = append(spanAtt, attribute.String("messaging.kafka.message.key", *key))
 	}
 
-	ctx, span := k.apm.StartSpan(ctx, "event/kafka/produceMessage", trace.WithAttributes(spanAtt...))
+	_, span := k.apm.StartSpan(ctx, "event/kafka/produceMessage", trace.WithAttributes(spanAtt...))
 	defer span.End()
 
 	message := &sarama.ProducerMessage{
