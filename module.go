@@ -59,7 +59,6 @@ func (f *FluxModule) AddRoute(fn RouteFn) *FluxModule {
 }
 func (m *FluxModule) HttpRoute(f *FluxGo, group string, method string, path string, config RouteIncome, handler HttpHandler) error {
 	http := f.GetHttp()
-	r := http.GetRouter(group)
 
 	fun := func(c *fiber.Ctx) error {
 		ctx := c.UserContext()
@@ -88,7 +87,7 @@ func (m *FluxModule) HttpRoute(f *FluxGo, group string, method string, path stri
 		return nil
 	}
 
-	if r == nil {
+	if r := http.GetRouter(group); r == nil {
 		http.app.Add(method, fmt.Sprintf("%s%s", group, path), fun)
 	} else {
 		(*r).Add(method, path, fun)
