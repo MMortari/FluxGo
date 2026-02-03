@@ -335,9 +335,9 @@ func (o *Database) RunTransaction(pCtx context.Context, handler func(ctx context
 	if err := handler(ctx, tx); err != nil {
 		span.SetError(err)
 
-		if err := tx.Rollback(); err != nil {
-			span.SetError(err)
-			return err
+		if errTx := tx.Rollback(); errTx != nil {
+			span.SetError(errTx)
+			return errTx
 		}
 
 		return err
