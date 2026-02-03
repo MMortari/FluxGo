@@ -45,6 +45,7 @@ jobs:
         working-directory: example/full
         run: |
           docker compose up -d
+          sleep 10
 
       - name: Test Examples
         working-directory: example/full
