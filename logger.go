@@ -4,15 +4,27 @@ import (
 	"context"
 	"os"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	cloudwatch "github.com/kdar/logrus-cloudwatchlogs"
 	"github.com/sirupsen/logrus"
 )
 
 type Logger = logrus.Entry
 
+type LoggerAwsOptions struct {
+	Region     string
+	KeyId      string
+	SecretKey  string
+	GroupName  string
+	StreamName string
+}
 type LoggerOptions struct {
 	Type        string
 	Level       string
 	LogFilePath string
+	Aws         *LoggerAwsOptions
 }
 
 func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
@@ -69,6 +81,26 @@ func handleLogType(log *logrus.Logger, opt LoggerOptions) {
 
 	case "console":
 		log.SetOutput(os.Stdout)
+
+	case "aws":
+		if opt.Aws == nil {
+			panic("AWS logger options are required for AWS logger type")
+		}
+
+		sess, err := session.NewSession(&aws.Config{
+			Region:      aws.String(opt.Aws.Region),
+			Credentials: credentials.NewStaticCredentials(opt.Aws.KeyId, opt.Aws.SecretKey, ""),
+		})
+		if err != nil {
+			log.Fatalf("Error to create aws session: %v", err)
+		}
+
+		hook, err := cloudwatch.NewHook(opt.Aws.GroupName, opt.Aws.StreamName, sess)
+		if err != nil {
+			log.Fatalf("Error creating CloudWatch hook: %v", err)
+		}
+
+		log.AddHook(hook)
 
 	default:
 		panic("Invalid logger type")
