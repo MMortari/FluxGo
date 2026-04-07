@@ -14,6 +14,7 @@ require (
 	github.com/invopop/jsonschema v0.13.0
 	github.com/jmoiron/sqlx v1.4.0
 	github.com/joho/godotenv v1.5.1
+	github.com/kdar/logrus-cloudwatchlogs v0.0.0-20200414190340-facbc54742f0
 	github.com/lib/pq v1.10.9
 	github.com/ollama/ollama v0.13.5
 	github.com/redis/go-redis/v9 v9.14.0
@@ -57,7 +58,7 @@ require (
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
-	github.com/kdar/logrus-cloudwatchlogs v0.0.0-20200414190340-facbc54742f0 // indirect
+	github.com/kdar/gtest v0.0.0-20171003232747-b20da4453579 // indirect
 	github.com/klauspost/compress v1.18.1 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
@@ -69,6 +70,7 @@ require (
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
 	github.com/rivo/uniseg v0.2.0 // indirect
 	github.com/robfig/cron/v3 v3.0.1 // indirect
+	github.com/smartystreets/assertions v1.13.0 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.51.0 // indirect
 	github.com/valyala/tcplisten v1.0.0 // indirect
