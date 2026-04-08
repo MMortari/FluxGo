@@ -68,6 +68,7 @@ type HttpOptions struct {
 	LogRequest      bool
 	AddHealthRoutes bool
 
+	Cors        *cors.Config
 	FiberConfig fiber.Config
 	Apm         *Apm
 }
@@ -80,7 +81,11 @@ func NewHttp(opt HttpOptions) *Http {
 		app.Use(opt.Apm.SetFiberMiddleware())
 	}
 	app.Use(helmet.New())
-	app.Use(cors.New())
+	if opt.Cors != nil {
+		app.Use(cors.New(*opt.Cors))
+	} else {
+		app.Use(cors.New())
+	}
 
 	if opt.ConfigApp != nil {
 		opt.ConfigApp(app)
