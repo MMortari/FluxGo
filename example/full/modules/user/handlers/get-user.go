@@ -10,21 +10,28 @@ import (
 	fluxgo "github.com/MMortari/FluxGo"
 	"github.com/MMortari/FluxGo/example/full/modules/user/dto"
 	"github.com/MMortari/FluxGo/example/full/shared/repositories"
+	"github.com/gofiber/fiber/v2"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 type HandlerGetUser struct {
 	repository *repositories.UserRepository
 	tools      *fluxgo.Tools
+	prom       *fluxgo.Prometheus
 }
 
-func HandlerGetUserStart(repository *repositories.UserRepository, tools *fluxgo.Tools) *HandlerGetUser {
-	return &HandlerGetUser{repository, tools}
+func HandlerGetUserStart(repository *repositories.UserRepository, tools *fluxgo.Tools, prom *fluxgo.Prometheus) *HandlerGetUser {
+	return &HandlerGetUser{repository, tools, prom}
 }
 
 func (h *HandlerGetUser) Execute(ctx c.Context, data *dto.GetUserReq) (*dto.GetUserRes, *fluxgo.GlobalError) {
 	tool, err := h.tools.GetOllamaTools()
 	if err != nil {
 		return nil, fluxgo.ErrorInternalError("Error to get ollama tools")
+	}
+
+	if counter := h.prom.GetCounterVec("counter"); counter != nil {
+		counter.With(prometheus.Labels{"user": data.IdUser}).Inc()
 	}
 
 	fmt.Printf("tool: %+v\n\n", tool)
@@ -65,4 +72,11 @@ func (h *HandlerGetUser) ExecuteTool(ctx c.Context, raw json.RawMessage) (json.R
 func (h *HandlerGetUser) HandleMessage(ctx c.Context, data []byte) error {
 	log.Println("New message on event: " + string(data))
 	return nil
+}
+func (h *HandlerGetUser) HandleHttp(c *fiber.Ctx, income interface{}) (*fluxgo.GlobalResponse, *fluxgo.GlobalError) {
+	resp, err := h.Execute(c.UserContext(), income.(*dto.GetUserReq))
+	if err != nil {
+		return nil, err
+	}
+	return &fluxgo.GlobalResponse{Content: resp, Status: 200}, nil
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/MMortari/FluxGo/example/full/modules/user"
 	"github.com/MMortari/FluxGo/example/full/shared/http"
 	"github.com/MMortari/FluxGo/example/full/shared/repositories"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -16,12 +17,18 @@ func Module() *fluxgo.FluxGo {
 	flux.AddApm(fluxgo.ApmOptions{CollectorURL: env.Apm.CollectorUrl, Exporter: env.Apm.Exporter})
 	flux.ConfigLogger(fluxgo.LoggerOptions{Type: env.Logger.Type, Level: env.Logger.Level, LogFilePath: env.Logger.FilePath})
 
+	prom := flux.AddPrometheus()
+	prom.NewCounterVec(prometheus.CounterOpts{
+		Name: "get_user",
+		Help: "Quantidade de requests para buscar usuários",
+	}, []string{"user"})
+
 	flux.AddDependency(func() *config.Env { return &env })
 	flux.AddDatabase(fluxgo.DatabaseOptions{Instances: []fluxgo.DatabaseConn{{Dsn: env.Database.Dsn}}})
 	flux.AddRedis(fluxgo.RedisOptions{Options: redis.Options{Addr: env.Redis.Addr}})
 	flux.AddKafka(env.Kafka.GetConfig())
 	flux.AddCron()
-	flux.AddHttp(http.GetHttp(flux.GetApm()))
+	flux.AddHttp(http.GetHttp(flux.GetApm(), prom))
 	flux.AddTools()
 
 	flux.AddDependency(repositories.UserRepositoryStart)
