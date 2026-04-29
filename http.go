@@ -71,6 +71,7 @@ type HttpOptions struct {
 	Cors        *cors.Config
 	FiberConfig fiber.Config
 	Apm         *Apm
+	Prometheus  *Prometheus
 }
 
 func NewHttp(opt HttpOptions) *Http {
@@ -108,6 +109,10 @@ func NewHttp(opt HttpOptions) *Http {
 	}
 
 	http := &Http{app: app, port: opt.Port, routers: make(map[string]*fiber.Router)}
+
+	if opt.Prometheus != nil {
+		http.app.Use(opt.Prometheus.Middleware(app, "/metrics"))
+	}
 
 	http.GetValidator()
 
