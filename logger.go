@@ -132,7 +132,7 @@ func (f *FluxGo) CreateLogger(c context.Context) *logrus.Entry {
 			spanFields["span.id"] = span.SpanContext().SpanID().String()
 		}
 
-		return f.logger.Entry.WithFields(spanFields)
+		return f.logger.WithFields(spanFields)
 	}
 
 	return f.logger.Entry
