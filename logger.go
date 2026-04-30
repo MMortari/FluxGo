@@ -113,7 +113,7 @@ func handleLogType(log *logrus.Logger, opt LoggerOptions) {
 	}
 }
 
-func (f *FluxGo) CreateLogger(c context.Context) *logrus.Entry {
+func (f *FluxGo) CreateLogger(c context.Context) *Logger {
 	if f.apm != nil {
 		span := f.apm.GetSpanFromContext(c)
 
@@ -132,8 +132,11 @@ func (f *FluxGo) CreateLogger(c context.Context) *logrus.Entry {
 			spanFields["span.id"] = span.SpanContext().SpanID().String()
 		}
 
-		return f.logger.WithFields(spanFields)
+		logger := *f.logger
+		logger.Entry = logger.WithFields(spanFields)
+
+		return &logger
 	}
 
-	return f.logger.Entry
+	return f.logger
 }
