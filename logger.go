@@ -11,7 +11,10 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-type Logger = logrus.Entry
+type Logger struct {
+	*logrus.Entry
+	opt LoggerOptions
+}
 
 type LoggerAwsOptions struct {
 	Region     string
@@ -37,11 +40,14 @@ func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
 	handleLogLevel(log, opt)
 	handleLogType(log, opt)
 
-	f.logger = log.WithFields(logrus.Fields{
-		"environment":     f.Env.Env,
-		"service.name":    f.GetCleanName(),
-		"service.version": f.Version,
-	})
+	f.logger = &Logger{
+		Entry: log.WithFields(logrus.Fields{
+			"environment":     f.Env.Env,
+			"service.name":    f.GetCleanName(),
+			"service.version": f.Version,
+		}),
+		opt: opt,
+	}
 
 	return f
 }
@@ -107,22 +113,27 @@ func handleLogType(log *logrus.Logger, opt LoggerOptions) {
 	}
 }
 
-func (f *FluxGo) CreateLogger(c context.Context) *Logger {
+func (f *FluxGo) CreateLogger(c context.Context) *logrus.Entry {
 	if f.apm != nil {
 		span := f.apm.GetSpanFromContext(c)
 
 		spanFields := logrus.Fields{}
 
 		if span.SpanContext().HasTraceID() {
-			spanFields["trace.id"] = span.SpanContext().TraceID().String()
+			traceID := span.SpanContext().TraceID().String()
+
+			spanFields["trace.id"] = traceID
+			if f.logger.opt.Type == "aws" && len(traceID) == 32 {
+				spanFields["aws.xray.trace_id"] = "1-" + traceID[:8] + "-" + traceID[8:]
+			}
 		}
 		if span.SpanContext().HasSpanID() {
 			spanFields["transaction.id"] = span.SpanContext().SpanID().String()
 			spanFields["span.id"] = span.SpanContext().SpanID().String()
 		}
 
-		return f.logger.WithFields(spanFields)
+		return f.logger.Entry.WithFields(spanFields)
 	}
 
-	return f.logger
+	return f.logger.Entry
 }
