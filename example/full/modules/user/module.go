@@ -38,7 +38,7 @@ func Module() *fluxgo.FluxModule {
 	})
 	mod.AddRoute(func(cron *fluxgo.Cron, logger *fluxgo.Logger, kafka *fluxgo.Kafka, handler *handlers.HandlerGetUser) error {
 		return mod.CronRoute(cron, "* * * * *", func(ctx context.Context) error {
-			logger.Infoln("Cron executed")
+			logger.Info("Cron executed")
 			log.Println("Cron executed")
 
 			content := map[string]interface{}{
