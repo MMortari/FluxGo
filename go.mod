@@ -22,6 +22,8 @@ require (
 	github.com/redis/go-redis/v9 v9.14.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.11.1
+	github.com/uptrace/opentelemetry-go-extra/otelsql v0.3.2
+	github.com/uptrace/opentelemetry-go-extra/otelsqlx v0.3.2
 	go.opentelemetry.io/otel v1.40.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace v1.38.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.38.0
