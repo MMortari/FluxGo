@@ -24,7 +24,7 @@ jobs:
         uses: mathieudutour/github-tag-action@v6.2
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          pre_release_branches: develop,feature/**
+          pre_release_branches: develop,feature/*
           append_to_pre_release_tag: beta
 
       - name: Create a GitHub release
