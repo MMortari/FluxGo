@@ -16,6 +16,7 @@ func main() {
 
 	flux := fluxgo.
 		New(fluxgo.FluxGoConfig{Name: "Migrations", Otel: &fluxgo.OtelOptions{CollectorURL: env.Apm.CollectorUrl, Exporter: env.Apm.Exporter}}).
+		AddApm().
 		AddDatabase(fluxgo.DatabaseOptions{Instances: []fluxgo.DatabaseConn{{Dsn: env.Database.Dsn}}})
 
 	seeds := `
