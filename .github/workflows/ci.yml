@@ -21,7 +21,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-go@v5
+      - name: Setup Golang with cache
+        uses: magnetikonline/action-golang-cache@v5
+        id: golang-with-cache
         with:
           go-version-file: go.mod
 
@@ -51,3 +53,12 @@ jobs:
         working-directory: example/full
         run: |
           ENV=test go test ./... -cover
+
+      - name: Save Golang cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ steps.golang-with-cache.outputs.build-cache-path }}
+            ${{ steps.golang-with-cache.outputs.module-cache-path }}
+          key: ${{ steps.golang-with-cache.outputs.cache-key }}
