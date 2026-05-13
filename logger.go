@@ -2,61 +2,79 @@ package fluxgo
 
 import (
 	"context"
-	"io"
+	"fmt"
 	"log/slog"
 	"os"
 	"strings"
-	"time"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/cloudwatchlogs"
 	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
+	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
+	"go.opentelemetry.io/otel/log/global"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
+	"go.uber.org/fx"
 )
 
 type Logger struct {
 	*slog.Logger
 	opt LoggerOptions
-}
 
-type LoggerAwsOptions struct {
-	Region     string
-	KeyId      string
-	SecretKey  string
-	GroupName  string
-	StreamName string
+	provider *sdklog.LoggerProvider
+}
+type LoggerInstance struct {
+	*slog.Logger
+	ctx context.Context
 }
 
 type LoggerOptions struct {
 	Type        string
 	Level       string
 	LogFilePath string
-	Aws         *LoggerAwsOptions
 }
 
 func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
-	if f.Env.IsTest() {
-		opt.Type = "console"
-	}
+	f.AddDependency(func() *Logger {
+		log := Logger{
+			Logger: otelslog.NewLogger(f.GetCleanName()).With(
+				slog.String("environment", f.Env.Env),
+				slog.String("service.name", f.GetCleanName()),
+				slog.String("service.version", f.Version),
+			),
+			opt: opt,
+		}
+		return &log
+	})
+	f.AddInvoke(func(lc fx.Lifecycle, log *Logger, o *Otel) error {
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				var logExporter sdklog.Exporter
+				if o.grpcConnection != nil {
+					logExporter, _ = otlploggrpc.New(context.Background(), otlploggrpc.WithGRPCConn(o.grpcConnection))
+				} else {
+					logExporter, _ = stdoutlog.New()
+				}
 
-	localHandler := buildLocalHandler(f, opt)
+				logProvider := sdklog.NewLoggerProvider(
+					sdklog.WithProcessor(sdklog.NewBatchProcessor(logExporter)),
+					sdklog.WithResource(o.res),
+				)
+				global.SetLoggerProvider(logProvider)
 
-	var handler slog.Handler = localHandler
-	if f.apm != nil && f.apm.LogProvider != nil {
-		otelHandler := otelslog.NewHandler(f.GetCleanName(),
-			otelslog.WithLoggerProvider(f.apm.LogProvider))
-		handler = newMultiHandler(localHandler, otelHandler)
-	}
+				log.provider = logProvider
 
-	f.logger = &Logger{
-		Logger: slog.New(handler).With(
-			"environment", f.Env.Env,
-			"service.name", f.GetCleanName(),
-			"service.version", f.Version,
-		),
-		opt: opt,
-	}
+				f.log("LOGGER", "Started")
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				if err := log.provider.Shutdown(ctx); err != nil {
+					return err
+				}
+				f.log("LOGGER", "Stopped")
+				return nil
+			},
+		})
+		return nil
+	})
 
 	return f
 }
@@ -73,38 +91,14 @@ func buildLocalHandler(f *FluxGo, opt LoggerOptions) slog.Handler {
 		if err != nil {
 			panic("Error opening log file: " + err.Error())
 		}
-		handlerOpts.ReplaceAttr = renameFileAttrs
 		return slog.NewJSONHandler(logFile, handlerOpts)
 
 	case "console":
 		return slog.NewTextHandler(os.Stdout, handlerOpts)
 
-	case "aws":
-		if opt.Aws == nil {
-			panic("AWS logger options are required for AWS logger type")
-		}
-		w := newCloudWatchWriter(opt.Aws)
-		handlerOpts.ReplaceAttr = renameFileAttrs
-		return slog.NewJSONHandler(w, handlerOpts)
-
 	default:
 		panic("Invalid logger type")
 	}
-}
-
-// renameFileAttrs maps slog default keys to the expected JSON field names.
-func renameFileAttrs(_ []string, a slog.Attr) slog.Attr {
-	switch a.Key {
-	case slog.TimeKey:
-		a.Key = "@timestamp"
-	case slog.LevelKey:
-		a.Key = "severity"
-	case slog.MessageKey:
-		a.Key = "message"
-	case slog.SourceKey:
-		a.Key = "function.name"
-	}
-	return a
 }
 
 func parseLogLevel(level string) slog.Level {
@@ -170,67 +164,37 @@ func (m *multiHandler) WithGroup(name string) slog.Handler {
 	return &multiHandler{handlers: newHandlers}
 }
 
-// cloudWatchWriter implements io.Writer by sending lines to AWS CloudWatch Logs.
-type cloudWatchWriter struct {
-	client     *cloudwatchlogs.CloudWatchLogs
-	groupName  string
-	streamName string
+func (f *FluxGo) CreateLogger(ctx context.Context) *LoggerInstance {
+	return &LoggerInstance{f.logger.Logger, ctx}
+}
+func (f *Logger) CreateLogger(ctx context.Context) *LoggerInstance {
+	return &LoggerInstance{f.Logger, ctx}
 }
 
-func newCloudWatchWriter(opt *LoggerAwsOptions) io.Writer {
-	sess, err := session.NewSession(&aws.Config{
-		Region:      aws.String(opt.Region),
-		Credentials: credentials.NewStaticCredentials(opt.KeyId, opt.SecretKey, ""),
-	})
-	if err != nil {
-		panic("Error creating AWS session: " + err.Error())
-	}
-	return &cloudWatchWriter{
-		client:     cloudwatchlogs.New(sess),
-		groupName:  opt.GroupName,
-		streamName: opt.StreamName,
-	}
+func (li *LoggerInstance) Log(level slog.Level, msg string, attrs ...slog.Attr) {
+	li.Logger.Log(li.ctx, level, msg, attrs)
 }
-
-func (w *cloudWatchWriter) Write(p []byte) (int, error) {
-	msg := string(p)
-	now := aws.Int64(time.Now().UnixMilli())
-	_, err := w.client.PutLogEvents(&cloudwatchlogs.PutLogEventsInput{
-		LogGroupName:  aws.String(w.groupName),
-		LogStreamName: aws.String(w.streamName),
-		LogEvents: []*cloudwatchlogs.InputLogEvent{
-			{Message: aws.String(msg), Timestamp: now},
-		},
-	})
-	if err != nil {
-		return 0, err
-	}
-	return len(p), nil
+func (li *LoggerInstance) Info(msg string, attrs ...slog.Attr) {
+	li.Logger.Log(li.ctx, slog.LevelInfo, msg, attrs)
 }
-
-func (f *FluxGo) CreateLogger(c context.Context) *Logger {
-	if f.apm != nil {
-		span := f.apm.GetSpanFromContext(c)
-		var args []any
-
-		if span.SpanContext().HasTraceID() {
-			traceID := span.SpanContext().TraceID().String()
-			args = append(args, "trace.id", traceID)
-			if f.logger.opt.Type == "aws" && len(traceID) == 32 {
-				args = append(args, "aws.xray.trace_id", "1-"+traceID[:8]+"-"+traceID[8:])
-			}
-		}
-		if span.SpanContext().HasSpanID() {
-			spanID := span.SpanContext().SpanID().String()
-			args = append(args, "transaction.id", spanID, "span.id", spanID)
-		}
-
-		if len(args) > 0 {
-			l := *f.logger
-			l.Logger = f.logger.With(args...)
-			return &l
-		}
-	}
-
-	return f.logger
+func (li *LoggerInstance) Infof(format string, a ...any) {
+	li.Logger.Log(li.ctx, slog.LevelInfo, fmt.Sprintf(format, a...))
+}
+func (li *LoggerInstance) Debug(msg string, attrs ...slog.Attr) {
+	li.Logger.Log(li.ctx, slog.LevelDebug, msg, attrs)
+}
+func (li *LoggerInstance) Debugf(format string, a ...any) {
+	li.Logger.Log(li.ctx, slog.LevelDebug, fmt.Sprintf(format, a...))
+}
+func (li *LoggerInstance) Warn(msg string, attrs ...slog.Attr) {
+	li.Logger.Log(li.ctx, slog.LevelWarn, msg, attrs)
+}
+func (li *LoggerInstance) Warnf(format string, a ...any) {
+	li.Logger.Log(li.ctx, slog.LevelWarn, fmt.Sprintf(format, a...))
+}
+func (li *LoggerInstance) Error(msg string, attrs ...slog.Attr) {
+	li.Logger.Log(li.ctx, slog.LevelError, msg, attrs)
+}
+func (li *LoggerInstance) Errorf(format string, a ...any) {
+	li.Logger.Log(li.ctx, slog.LevelError, fmt.Sprintf(format, a...))
 }

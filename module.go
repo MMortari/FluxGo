@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v2"
-	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 )
 
@@ -47,6 +46,10 @@ type RouteIncome struct {
 }
 type EntityData any
 
+type HttpHandlers interface {
+	HandleHttp(c *fiber.Ctx, income interface{}) (*GlobalResponse, *GlobalError)
+}
+
 type HttpHandler func(c *fiber.Ctx, income interface{}) (*GlobalResponse, *GlobalError)
 type CronHandler func(ctx context.Context) error
 
@@ -57,9 +60,16 @@ func (f *FluxModule) AddRoute(fn RouteFn) *FluxModule {
 
 	return f
 }
-func (m *FluxModule) HttpRoute(f *FluxGo, group string, method string, path string, config RouteIncome, handler HttpHandler) error {
-	http := f.GetHttp()
 
+func (f *FluxModule) Route(defs ...RouteDefinition) *FluxModule {
+	for _, def := range defs {
+		f.invokes = append(f.invokes, def.toFxOption(f))
+	}
+
+	return f
+}
+
+func (m *FluxModule) HttpRoute(f *FluxGo, http *Http, group string, method string, path string, config RouteIncome, handler HttpHandler) error {
 	fun := func(c *fiber.Ctx) error {
 		ctx := c.UserContext()
 
@@ -169,33 +179,33 @@ func (i *RouteIncome) cacheVal(serviceName, val string) string {
 }
 func (i *RouteIncome) cache(ctx context.Context, f *FluxGo, cache RouteIncome, key string) *string {
 	if cache.Cache != nil && cache.CacheTTL.Milliseconds() != 0 {
-		ctx, span := f.apm.StartSpan(ctx, "cache/get")
-		defer span.End()
+		// ctx, span := apm.StartSpan(ctx, "cache/get")
+		// defer span.End()
 
 		return cache.Cache.Get(ctx, key)
 	}
 
 	return nil
 }
-func (i *RouteIncome) cacheStore(pCtx context.Context, f *FluxGo, cache RouteIncome, key string, res *GlobalResponse) {
+func (i *RouteIncome) cacheStore(ctx context.Context, f *FluxGo, cache RouteIncome, key string, res *GlobalResponse) {
 	if cache.Cache != nil && cache.CacheTTL.Milliseconds() != 0 {
-		ctx, span := f.apm.StartSpan(context.Background(), "cache/store")
-		defer span.End()
-		span.AddLink(trace.LinkFromContext(pCtx))
+		// ctx, span := apm.StartSpan(context.Background(), "cache/store")
+		// defer span.End()
+		// span.AddLink(trace.LinkFromContext(pCtx))
 
 		if err := cache.Cache.Store(ctx, key, res.Content, cache.CacheTTL); err != nil {
-			span.SetError(err)
+			// span.SetError(err)
 		}
 	}
 }
-func (i *RouteIncome) cacheInvalidate(pCtx context.Context, f *FluxGo, cache RouteIncome) {
+func (i *RouteIncome) cacheInvalidate(ctx context.Context, f *FluxGo, cache RouteIncome) {
 	if len(cache.CacheInvalidate) == 0 {
 		return
 	}
 
-	ctx, span := f.apm.StartSpan(context.Background(), "cache/invalidate")
-	defer span.End()
-	span.AddLink(trace.LinkFromContext(pCtx))
+	// ctx, span := apm.StartSpan(context.Background(), "cache/invalidate")
+	// defer span.End()
+	// span.AddLink(trace.LinkFromContext(pCtx))
 
 	newKeys := make([]string, 0, len(cache.CacheInvalidate))
 
@@ -205,7 +215,7 @@ func (i *RouteIncome) cacheInvalidate(pCtx context.Context, f *FluxGo, cache Rou
 
 	if cache.Cache != nil {
 		if err := cache.Cache.Invalidate(ctx, newKeys); err != nil {
-			span.SetError(err)
+			// span.SetError(err)
 		}
 	}
 }

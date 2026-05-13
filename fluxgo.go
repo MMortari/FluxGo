@@ -15,8 +15,7 @@ type FluxGo struct {
 	cleanName string
 
 	logger *Logger
-	apm    *Apm
-	http   *Http
+	otel   *Otel
 	db     *Database
 
 	dependencies []fx.Option
@@ -31,6 +30,7 @@ type FluxGoConfig struct {
 	Debugger     bool
 	FullDebugger bool
 	Env          *Env
+	Otel         *OtelOptions
 }
 
 func New(config FluxGoConfig) *FluxGo {
@@ -48,13 +48,16 @@ func New(config FluxGoConfig) *FluxGo {
 		init.Env = &env
 	}
 
-	init.ConfigLogger(LoggerOptions{Type: "console"})
-
 	init.dependencies = append(init.dependencies, fx.Provide(func() *FluxGo { return &init }))
-	init.dependencies = append(init.dependencies, fx.Provide(func() *Logger { return init.logger }))
 
 	init.db = &Database{dbs: make(map[string]*databaseData)}
 	init.dependencies = append(init.dependencies, fx.Provide(func() *Database { return init.db }))
+
+	if init.Otel != nil {
+		init.addOtel(*init.Otel)
+	} else {
+		init.addOtel(OtelOptions{Exporter: "log"})
+	}
 
 	return &init
 }

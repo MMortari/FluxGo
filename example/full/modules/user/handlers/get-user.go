@@ -4,7 +4,6 @@ import (
 	c "context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 
 	fluxgo "github.com/MMortari/FluxGo"
@@ -18,13 +17,16 @@ type HandlerGetUser struct {
 	repository *repositories.UserRepository
 	tools      *fluxgo.Tools
 	prom       *fluxgo.Prometheus
+	logger     *fluxgo.Logger
 }
 
-func HandlerGetUserStart(repository *repositories.UserRepository, tools *fluxgo.Tools, prom *fluxgo.Prometheus) *HandlerGetUser {
-	return &HandlerGetUser{repository, tools, prom}
+func HandlerGetUserStart(repository *repositories.UserRepository, tools *fluxgo.Tools, prom *fluxgo.Prometheus, logger *fluxgo.Logger) *HandlerGetUser {
+	return &HandlerGetUser{repository, tools, prom, logger}
 }
 
 func (h *HandlerGetUser) Execute(ctx c.Context, data *dto.GetUserReq) (*dto.GetUserRes, *fluxgo.GlobalError) {
+	log := h.logger.CreateLogger(ctx)
+
 	tool, err := h.tools.GetOllamaTools()
 	if err != nil {
 		return nil, fluxgo.ErrorInternalError("Error to get ollama tools")
@@ -34,7 +36,7 @@ func (h *HandlerGetUser) Execute(ctx c.Context, data *dto.GetUserReq) (*dto.GetU
 		counter.With(prometheus.Labels{"user": data.IdUser}).Inc()
 	}
 
-	fmt.Printf("tool: %+v\n\n", tool)
+	log.Infof("tool: %+v\n\n", tool)
 
 	user, err := h.repository.GetUser(ctx)
 	if err != nil {
@@ -67,6 +69,12 @@ func (h *HandlerGetUser) ExecuteTool(ctx c.Context, raw json.RawMessage) (json.R
 	}
 
 	return json.Marshal(res)
+}
+
+func (h *HandlerGetUser) HandleCron(ctx c.Context) error {
+	h.logger.Info("Cron executed")
+	log.Println("Cron executed")
+	return nil
 }
 
 func (h *HandlerGetUser) HandleMessage(ctx c.Context, data []byte) error {

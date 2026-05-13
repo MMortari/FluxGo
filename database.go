@@ -78,8 +78,8 @@ func (f *FluxGo) AddDatabase(data DatabaseOptions) *FluxGo {
 	f.db.dbs[name] = &database
 
 	f.db.once.Do(func() {
-		f.AddInvoke(func(lc fx.Lifecycle, db *Database) error {
-			f.db.apm = f.apm
+		f.AddInvoke(func(lc fx.Lifecycle, db *Database, apm *Apm) error {
+			f.db.apm = apm
 
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
