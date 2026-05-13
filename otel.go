@@ -5,21 +5,14 @@ import (
 	"os"
 
 	"go.opentelemetry.io/otel/attribute"
-	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
-	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
 type Otel struct {
-	traceProvider *sdktrace.TracerProvider
-	logProvider   *sdklog.LoggerProvider
-	Tracer        *trace.Tracer
-
 	grpcConnection *grpc.ClientConn
 
 	res *resource.Resource
@@ -47,14 +40,16 @@ func (f *FluxGo) addOtel(opt OtelOptions) *FluxGo {
 	f.AddInvoke(func(lc fx.Lifecycle, o *Otel) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				conn, err := grpc.NewClient("otel-collector:4317",
-					grpc.WithTransportCredentials(insecure.NewCredentials()),
-				)
-				if err != nil {
-					return err
-				}
+				if o.opt.Exporter == "grpc" {
+					conn, err := grpc.NewClient(opt.CollectorURL,
+						grpc.WithTransportCredentials(insecure.NewCredentials()),
+					)
+					if err != nil {
+						return err
+					}
 
-				o.grpcConnection = conn
+					o.grpcConnection = conn
+				}
 
 				return nil
 			},

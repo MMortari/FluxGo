@@ -38,8 +38,6 @@ func Module() *fluxgo.FluxGo {
 	flux.AddHttp(fluxgo.HttpOptions{Port: 3333, LogRequest: true, AddHealthRoutes: true}, func(http *fluxgo.Http) {
 		http.CreateRouter("/public", middlewareExample())
 		http.CreateRouter("/internal", middlewareExample())
-
-		return
 	})
 	flux.AddTools()
 

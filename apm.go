@@ -79,12 +79,6 @@ func (s *Span) SetAttributeString(key, val string) {
 	s.SetAttributes(attribute.String(key, val))
 }
 
-type configApmI struct {
-	ServiceName    string
-	ServiceVersion string
-	Env            string
-}
-
 func (apm Apm) SetFiberMiddleware() func(*fiber.Ctx) error {
 	return otelfiber.Middleware(otelfiber.WithSpanNameFormatter(func(ctx *fiber.Ctx) string {
 		return fmt.Sprintf("%s %s", ctx.Method(), ctx.Route().Path)

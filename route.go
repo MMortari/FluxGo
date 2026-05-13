@@ -41,14 +41,14 @@ func HttpDef[T any, PT interface {
 		group: group, method: method, path: path, config: config,
 		makeFn: func(m *FluxModule) interface{} {
 			if needsCache {
-				return func(f *FluxGo, http *Http, redis *Redis, handler PT) error {
+				return func(f *FluxGo, http *Http, apm *Apm, redis *Redis, handler PT) error {
 					cfg := config
 					cfg.Cache = redis
-					return m.HttpRoute(f, http, group, method, path, cfg, handler.HandleHttp)
+					return m.HttpRoute(f, http, apm, group, method, path, cfg, handler.HandleHttp)
 				}
 			}
-			return func(f *FluxGo, http *Http, handler PT) error {
-				return m.HttpRoute(f, http, group, method, path, config, handler.HandleHttp)
+			return func(f *FluxGo, http *Http, apm *Apm, handler PT) error {
+				return m.HttpRoute(f, http, apm, group, method, path, config, handler.HandleHttp)
 			}
 		},
 	}
