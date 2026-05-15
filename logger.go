@@ -48,6 +48,10 @@ func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
 	f.AddInvoke(func(lc fx.Lifecycle, log *Logger, o *Otel) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
+				if f.Env.IsTest() {
+					opt.Type = "console"
+				}
+
 				var processor sdklog.Processor
 
 				switch opt.Type {
