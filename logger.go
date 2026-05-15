@@ -2,141 +2,144 @@ package fluxgo
 
 import (
 	"context"
+	"fmt"
+	"log/slog"
 	"os"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
-	cloudwatch "github.com/kdar/logrus-cloudwatchlogs"
-	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/contrib/bridges/otelslog"
+	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
+	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
+	"go.opentelemetry.io/otel/log/global"
+	sdklog "go.opentelemetry.io/otel/sdk/log"
+	"go.uber.org/fx"
 )
 
 type Logger struct {
-	*logrus.Entry
+	*slog.Logger
 	opt LoggerOptions
+
+	provider *sdklog.LoggerProvider
+	file     *os.File
+}
+type LoggerInstance struct {
+	*slog.Logger
+	ctx context.Context
 }
 
-type LoggerAwsOptions struct {
-	Region     string
-	KeyId      string
-	SecretKey  string
-	GroupName  string
-	StreamName string
-}
 type LoggerOptions struct {
+	// Options: console, file, otel
 	Type        string
 	Level       string
 	LogFilePath string
-	Aws         *LoggerAwsOptions
 }
 
 func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
-	if f.Env.IsTest() {
-		opt.Type = "console"
-	}
+	f.AddDependency(func() *Logger {
+		log := Logger{
+			Logger: otelslog.NewLogger(f.GetCleanName()).With(
+				slog.String("environment", f.Env.Env),
+				slog.String("service.name", f.GetCleanName()),
+				slog.String("service.version", f.Version),
+			),
+			opt: opt,
+		}
+		return &log
+	})
+	f.AddInvoke(func(lc fx.Lifecycle, log *Logger, o *Otel) error {
+		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				if f.Env.IsTest() {
+					opt.Type = "console"
+				}
 
-	log := logrus.New()
+				var processor sdklog.Processor
 
-	handleLogLevel(log, opt)
-	handleLogType(log, opt)
+				switch opt.Type {
+				case "otel":
+					if o.grpcConnection != nil {
+						logExporter, err := otlploggrpc.New(context.Background(), otlploggrpc.WithGRPCConn(o.grpcConnection))
+						if err != nil {
+							return err
+						}
+						processor = sdklog.NewBatchProcessor(logExporter)
+					}
+				case "file":
+					logFile, err := os.OpenFile(opt.LogFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+					if err != nil {
+						return fmt.Errorf("open log file: %w", err)
+					}
+					log.file = logFile
+					logExporter, err := stdoutlog.New(stdoutlog.WithWriter(logFile))
+					if err != nil {
+						return err
+					}
+					processor = sdklog.NewBatchProcessor(logExporter)
+				default:
+					logExporter, err := stdoutlog.New()
+					if err != nil {
+						return err
+					}
+					processor = sdklog.NewSimpleProcessor(logExporter)
+				}
 
-	f.logger = &Logger{
-		Entry: log.WithFields(logrus.Fields{
-			"environment":     f.Env.Env,
-			"service.name":    f.GetCleanName(),
-			"service.version": f.Version,
-		}),
-		opt: opt,
-	}
+				logProvider := sdklog.NewLoggerProvider(
+					sdklog.WithProcessor(processor),
+					sdklog.WithResource(o.res),
+				)
+				global.SetLoggerProvider(logProvider)
+
+				log.provider = logProvider
+
+				f.log("LOGGER", "Started")
+				return nil
+			},
+			OnStop: func(ctx context.Context) error {
+				if err := log.provider.Shutdown(ctx); err != nil {
+					return err
+				}
+				if log.file != nil {
+					if err := log.file.Close(); err != nil {
+						return err
+					}
+				}
+				f.log("LOGGER", "Stopped")
+				return nil
+			},
+		})
+		return nil
+	})
 
 	return f
 }
 
-func handleLogLevel(log *logrus.Logger, opt LoggerOptions) {
-	if opt.Level == "" {
-		opt.Level = "debug"
-	}
-
-	level, err := logrus.ParseLevel(opt.Level)
-	if err != nil {
-		panic("Invalid log level")
-	}
-	log.SetLevel(level)
+func (f *FluxGo) CreateLogger(ctx context.Context) *LoggerInstance {
+	return &LoggerInstance{f.logger.Logger, ctx}
 }
-func handleLogType(log *logrus.Logger, opt LoggerOptions) {
-	switch opt.Type {
-	case "file":
-		if opt.LogFilePath == "" {
-			panic("Log file path is required for file logger type")
-		}
-
-		logFile, err := os.OpenFile(opt.LogFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-		if err != nil {
-			log.Fatal("Error to open log file: ", err)
-		}
-
-		log.SetOutput(logFile)
-		log.SetFormatter(&logrus.JSONFormatter{
-			FieldMap: logrus.FieldMap{
-				logrus.FieldKeyTime:  "@timestamp",
-				logrus.FieldKeyLevel: "severity",
-				logrus.FieldKeyMsg:   "message",
-				logrus.FieldKeyFunc:  "function.name",
-			},
-		})
-
-	case "console":
-		log.SetOutput(os.Stdout)
-
-	case "aws":
-		if opt.Aws == nil {
-			panic("AWS logger options are required for AWS logger type")
-		}
-
-		sess, err := session.NewSession(&aws.Config{
-			Region:      aws.String(opt.Aws.Region),
-			Credentials: credentials.NewStaticCredentials(opt.Aws.KeyId, opt.Aws.SecretKey, ""),
-		})
-		if err != nil {
-			log.Fatalf("Error to create aws session: %v", err)
-		}
-
-		hook, err := cloudwatch.NewHook(opt.Aws.GroupName, opt.Aws.StreamName, sess)
-		if err != nil {
-			log.Fatalf("Error creating CloudWatch hook: %v", err)
-		}
-
-		log.AddHook(hook)
-
-	default:
-		panic("Invalid logger type")
-	}
+func (f *Logger) CreateLogger(ctx context.Context) *LoggerInstance {
+	return &LoggerInstance{f.Logger, ctx}
 }
 
-func (f *FluxGo) CreateLogger(c context.Context) *Logger {
-	if f.apm != nil {
-		span := f.apm.GetSpanFromContext(c)
-
-		spanFields := logrus.Fields{}
-
-		if span.SpanContext().HasTraceID() {
-			traceID := span.SpanContext().TraceID().String()
-
-			spanFields["trace.id"] = traceID
-			if f.logger.opt.Type == "aws" && len(traceID) == 32 {
-				spanFields["aws.xray.trace_id"] = "1-" + traceID[:8] + "-" + traceID[8:]
-			}
-		}
-		if span.SpanContext().HasSpanID() {
-			spanFields["transaction.id"] = span.SpanContext().SpanID().String()
-			spanFields["span.id"] = span.SpanContext().SpanID().String()
-		}
-
-		logger := *f.logger
-		logger.Entry = logger.WithFields(spanFields)
-
-		return &logger
-	}
-
-	return f.logger
+func (li *LoggerInstance) Info(msg string, attrs ...slog.Attr) {
+	li.LogAttrs(li.ctx, slog.LevelInfo, msg, attrs...)
+}
+func (li *LoggerInstance) Infof(format string, a ...any) {
+	li.Log(li.ctx, slog.LevelInfo, fmt.Sprintf(format, a...))
+}
+func (li *LoggerInstance) Debug(msg string, attrs ...slog.Attr) {
+	li.LogAttrs(li.ctx, slog.LevelDebug, msg, attrs...)
+}
+func (li *LoggerInstance) Debugf(format string, a ...any) {
+	li.Log(li.ctx, slog.LevelDebug, fmt.Sprintf(format, a...))
+}
+func (li *LoggerInstance) Warn(msg string, attrs ...slog.Attr) {
+	li.LogAttrs(li.ctx, slog.LevelWarn, msg, attrs...)
+}
+func (li *LoggerInstance) Warnf(format string, a ...any) {
+	li.Log(li.ctx, slog.LevelWarn, fmt.Sprintf(format, a...))
+}
+func (li *LoggerInstance) Error(msg string, attrs ...slog.Attr) {
+	li.LogAttrs(li.ctx, slog.LevelError, msg, attrs...)
+}
+func (li *LoggerInstance) Errorf(format string, a ...any) {
+	li.Log(li.ctx, slog.LevelError, fmt.Errorf(format, a...).Error())
 }

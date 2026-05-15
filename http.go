@@ -16,14 +16,76 @@ import (
 	"go.uber.org/fx"
 )
 
-func (f *FluxGo) AddHttp(http *Http) *FluxGo {
-	f.AddDependency(func() *Http {
+type HttpConfig func(HttpConfigData)
+type HttpConfigData struct {
+	*Http
+
+	Apm        *Apm        `optional:"true"`
+	Prometheus *Prometheus `optional:"true"`
+}
+
+type HttpParams struct {
+	fx.In
+
+	Apm        *Apm        `optional:"true"`
+	Prometheus *Prometheus `optional:"true"`
+}
+
+func (f *FluxGo) AddHttp(opt HttpOptions, configApp HttpConfig) *FluxGo {
+	f.AddDependency(func(params HttpParams) *Http {
+		opt.FiberConfig.DisableStartupMessage = true
+		app := fiber.New(opt.FiberConfig)
+
+		if params.Apm != nil {
+			app.Use(params.Apm.SetFiberMiddleware())
+		}
+		app.Use(helmet.New())
+		if opt.Cors != nil {
+			app.Use(cors.New(*opt.Cors))
+		} else {
+			app.Use(cors.New())
+		}
+
+		if opt.ConfigApp != nil {
+			opt.ConfigApp(app)
+		}
+		if opt.LogRequest {
+			app.Use(logger.New(logger.Config{
+				Format: "${time} ${status} - ${method} ${path} ${latency}\n",
+			}))
+		}
+		if opt.AddHealthRoutes {
+			app.Get("/live", func(c *fiber.Ctx) error {
+				return c.SendStatus(fiber.StatusOK)
+			})
+			app.Get("/health", func(c *fiber.Ctx) error {
+				return c.SendStatus(fiber.StatusOK)
+			})
+			app.Get("/readyz", func(c *fiber.Ctx) error {
+				return c.SendStatus(fiber.StatusOK)
+			})
+		}
+
+		http := &Http{app: app, port: opt.Port, routers: make(map[string]*fiber.Router)}
+
+		if params.Prometheus != nil {
+			http.app.Use(params.Prometheus.Middleware(app, "/metrics"))
+		}
+
+		http.GetValidator()
+
+		configApp(HttpConfigData{
+			Http:       http,
+			Apm:        params.Apm,
+			Prometheus: params.Prometheus,
+		})
+
 		return http
 	})
-	f.AddInvoke(func(lc fx.Lifecycle) error {
+	f.AddInvoke(func(lc fx.Lifecycle, http *Http) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				if err := http.Start(ctx); err != nil {
+				if err := http.start(ctx); err != nil {
 					return err
 				}
 				f.log("HTTP", fmt.Sprintf("Running on port %d", http.port))
@@ -31,7 +93,7 @@ func (f *FluxGo) AddHttp(http *Http) *FluxGo {
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				if err := http.Stop(ctx); err != nil {
+				if err := http.stop(ctx); err != nil {
 					return err
 				}
 				f.log("HTTP", "Stopped")
@@ -43,12 +105,7 @@ func (f *FluxGo) AddHttp(http *Http) *FluxGo {
 		return nil
 	})
 
-	f.http = http
-
 	return f
-}
-func (f *FluxGo) GetHttp() *Http {
-	return f.http
 }
 
 type Validator struct {
@@ -70,56 +127,9 @@ type HttpOptions struct {
 
 	Cors        *cors.Config
 	FiberConfig fiber.Config
-	Apm         *Apm
-	Prometheus  *Prometheus
 }
 
-func NewHttp(opt HttpOptions) *Http {
-	opt.FiberConfig.DisableStartupMessage = true
-	app := fiber.New(opt.FiberConfig)
-
-	if opt.Apm != nil {
-		app.Use(opt.Apm.SetFiberMiddleware())
-	}
-	app.Use(helmet.New())
-	if opt.Cors != nil {
-		app.Use(cors.New(*opt.Cors))
-	} else {
-		app.Use(cors.New())
-	}
-
-	if opt.ConfigApp != nil {
-		opt.ConfigApp(app)
-	}
-	if opt.LogRequest {
-		app.Use(logger.New(logger.Config{
-			Format: "${time} ${status} - ${method} ${path} ${latency}\n",
-		}))
-	}
-	if opt.AddHealthRoutes {
-		app.Get("/live", func(c *fiber.Ctx) error {
-			return c.SendStatus(fiber.StatusOK)
-		})
-		app.Get("/health", func(c *fiber.Ctx) error {
-			return c.SendStatus(fiber.StatusOK)
-		})
-		app.Get("/readyz", func(c *fiber.Ctx) error {
-			return c.SendStatus(fiber.StatusOK)
-		})
-	}
-
-	http := &Http{app: app, port: opt.Port, routers: make(map[string]*fiber.Router)}
-
-	if opt.Prometheus != nil {
-		http.app.Use(opt.Prometheus.Middleware(app, "/metrics"))
-	}
-
-	http.GetValidator()
-
-	return http
-}
-
-func (h *Http) Start(ctx context.Context) error {
+func (h *Http) start(ctx context.Context) error {
 	errCh := make(chan error, 1)
 
 	go func() {
@@ -158,7 +168,7 @@ func (h *Http) Start(ctx context.Context) error {
 		return ctx.Err()
 	}
 }
-func (h *Http) Stop(ctx context.Context) error {
+func (h *Http) stop(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 

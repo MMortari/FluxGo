@@ -47,6 +47,10 @@ type RouteIncome struct {
 }
 type EntityData any
 
+type HttpHandlers interface {
+	HandleHttp(c *fiber.Ctx, income interface{}) (*GlobalResponse, *GlobalError)
+}
+
 type HttpHandler func(c *fiber.Ctx, income interface{}) (*GlobalResponse, *GlobalError)
 type CronHandler func(ctx context.Context) error
 
@@ -57,13 +61,20 @@ func (f *FluxModule) AddRoute(fn RouteFn) *FluxModule {
 
 	return f
 }
-func (m *FluxModule) HttpRoute(f *FluxGo, group string, method string, path string, config RouteIncome, handler HttpHandler) error {
-	http := f.GetHttp()
 
+func (f *FluxModule) Route(defs ...RouteDefinition) *FluxModule {
+	for _, def := range defs {
+		f.invokes = append(f.invokes, def.toFxOption(f))
+	}
+
+	return f
+}
+
+func (m *FluxModule) HttpRoute(f *FluxGo, http *Http, apm *Apm, group string, method string, path string, config RouteIncome, handler HttpHandler) error {
 	fun := func(c *fiber.Ctx) error {
 		ctx := c.UserContext()
 
-		if cacheRes := config.cache(ctx, f, config, config.cacheKey(c, f.GetCleanName())); cacheRes != nil {
+		if cacheRes := config.cache(ctx, f, apm, config, config.cacheKey(c, f.GetCleanName())); cacheRes != nil {
 			return c.Status(200).Send([]byte(*cacheRes))
 		}
 
@@ -77,8 +88,8 @@ func (m *FluxModule) HttpRoute(f *FluxGo, group string, method string, path stri
 			return c.Status(gErr.Status).JSON(gErr)
 		}
 
-		go config.cacheStore(ctx, f, config, config.cacheKey(c, f.GetCleanName()), res)
-		go config.cacheInvalidate(ctx, f, config)
+		go config.cacheStore(ctx, f, apm, config, config.cacheKey(c, f.GetCleanName()), res)
+		go config.cacheInvalidate(ctx, f, apm, config)
 
 		if res != nil {
 			return c.Status(res.Status).JSON(res.Content)
@@ -167,9 +178,9 @@ func (i *RouteIncome) cacheKey(c *fiber.Ctx, serviceName string) string {
 func (i *RouteIncome) cacheVal(serviceName, val string) string {
 	return fmt.Sprintf("%s:endpoint:%s", serviceName, val)
 }
-func (i *RouteIncome) cache(ctx context.Context, f *FluxGo, cache RouteIncome, key string) *string {
+func (i *RouteIncome) cache(ctx context.Context, f *FluxGo, apm *Apm, cache RouteIncome, key string) *string {
 	if cache.Cache != nil && cache.CacheTTL.Milliseconds() != 0 {
-		ctx, span := f.apm.StartSpan(ctx, "cache/get")
+		ctx, span := apm.StartSpan(ctx, "cache/get")
 		defer span.End()
 
 		return cache.Cache.Get(ctx, key)
@@ -177,9 +188,9 @@ func (i *RouteIncome) cache(ctx context.Context, f *FluxGo, cache RouteIncome, k
 
 	return nil
 }
-func (i *RouteIncome) cacheStore(pCtx context.Context, f *FluxGo, cache RouteIncome, key string, res *GlobalResponse) {
+func (i *RouteIncome) cacheStore(pCtx context.Context, f *FluxGo, apm *Apm, cache RouteIncome, key string, res *GlobalResponse) {
 	if cache.Cache != nil && cache.CacheTTL.Milliseconds() != 0 {
-		ctx, span := f.apm.StartSpan(context.Background(), "cache/store")
+		ctx, span := apm.StartSpan(context.Background(), "cache/store")
 		defer span.End()
 		span.AddLink(trace.LinkFromContext(pCtx))
 
@@ -188,12 +199,12 @@ func (i *RouteIncome) cacheStore(pCtx context.Context, f *FluxGo, cache RouteInc
 		}
 	}
 }
-func (i *RouteIncome) cacheInvalidate(pCtx context.Context, f *FluxGo, cache RouteIncome) {
+func (i *RouteIncome) cacheInvalidate(pCtx context.Context, f *FluxGo, apm *Apm, cache RouteIncome) {
 	if len(cache.CacheInvalidate) == 0 {
 		return
 	}
 
-	ctx, span := f.apm.StartSpan(context.Background(), "cache/invalidate")
+	ctx, span := apm.StartSpan(context.Background(), "cache/invalidate")
 	defer span.End()
 	span.AddLink(trace.LinkFromContext(pCtx))
 

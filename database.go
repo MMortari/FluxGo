@@ -14,7 +14,10 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
+	"github.com/uptrace/opentelemetry-go-extra/otelsql"
+	"github.com/uptrace/opentelemetry-go-extra/otelsqlx"
 	"go.opentelemetry.io/otel/attribute"
+	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 	"go.uber.org/multierr"
@@ -62,7 +65,7 @@ func (f *FluxGo) AddDatabase(data DatabaseOptions) *FluxGo {
 	}
 
 	for _, item := range data.Instances {
-		db, err := sqlx.Open("postgres", item.Dsn)
+		db, err := otelsqlx.Open("postgres", item.Dsn, otelsql.WithAttributes(semconv.DBSystemPostgreSQL))
 		if err != nil {
 			log.Fatalln("Error to create database client", err)
 		}
@@ -78,8 +81,8 @@ func (f *FluxGo) AddDatabase(data DatabaseOptions) *FluxGo {
 	f.db.dbs[name] = &database
 
 	f.db.once.Do(func() {
-		f.AddInvoke(func(lc fx.Lifecycle, db *Database) error {
-			f.db.apm = f.apm
+		f.AddInvoke(func(lc fx.Lifecycle, db *Database, apm *Apm) error {
+			f.db.apm = apm
 
 			lc.Append(fx.Hook{
 				OnStart: func(ctx context.Context) error {
