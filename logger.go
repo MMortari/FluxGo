@@ -94,7 +94,9 @@ func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
 					return err
 				}
 				if log.file != nil {
-					log.file.Close()
+					if err := log.file.Close(); err != nil {
+						return err
+					}
 				}
 				f.log("LOGGER", "Stopped")
 				return nil
