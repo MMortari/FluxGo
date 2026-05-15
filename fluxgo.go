@@ -14,9 +14,8 @@ type FluxGo struct {
 	FluxGoConfig
 	cleanName string
 
-	logger *Logger
-	otel   *Otel
-	db     *Database
+	otel *Otel
+	db   *Database
 
 	dependencies []fx.Option
 	invokes      []fx.Option
