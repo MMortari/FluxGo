@@ -112,9 +112,6 @@ func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
 	return f
 }
 
-func (f *FluxGo) CreateLogger(ctx context.Context) *LoggerInstance {
-	return &LoggerInstance{f.logger.Logger, ctx}
-}
 func (f *Logger) CreateLogger(ctx context.Context) *LoggerInstance {
 	return &LoggerInstance{f.Logger, ctx}
 }
