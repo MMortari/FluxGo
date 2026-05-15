@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
@@ -18,6 +19,7 @@ type Logger struct {
 	opt LoggerOptions
 
 	provider *sdklog.LoggerProvider
+	file     *os.File
 }
 type LoggerInstance struct {
 	*slog.Logger
@@ -25,6 +27,7 @@ type LoggerInstance struct {
 }
 
 type LoggerOptions struct {
+	// Options: console, file, otel
 	Type        string
 	Level       string
 	LogFilePath string
@@ -45,15 +48,38 @@ func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
 	f.AddInvoke(func(lc fx.Lifecycle, log *Logger, o *Otel) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				var logExporter sdklog.Exporter
-				if o.grpcConnection != nil {
-					logExporter, _ = otlploggrpc.New(context.Background(), otlploggrpc.WithGRPCConn(o.grpcConnection))
-				} else {
-					logExporter, _ = stdoutlog.New()
+				var processor sdklog.Processor
+
+				switch opt.Type {
+				case "otel":
+					if o.grpcConnection != nil {
+						logExporter, err := otlploggrpc.New(context.Background(), otlploggrpc.WithGRPCConn(o.grpcConnection))
+						if err != nil {
+							return err
+						}
+						processor = sdklog.NewBatchProcessor(logExporter)
+					}
+				case "file":
+					logFile, err := os.OpenFile(opt.LogFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+					if err != nil {
+						return fmt.Errorf("open log file: %w", err)
+					}
+					log.file = logFile
+					logExporter, err := stdoutlog.New(stdoutlog.WithWriter(logFile))
+					if err != nil {
+						return err
+					}
+					processor = sdklog.NewBatchProcessor(logExporter)
+				default:
+					logExporter, err := stdoutlog.New()
+					if err != nil {
+						return err
+					}
+					processor = sdklog.NewSimpleProcessor(logExporter)
 				}
 
 				logProvider := sdklog.NewLoggerProvider(
-					sdklog.WithProcessor(sdklog.NewBatchProcessor(logExporter)),
+					sdklog.WithProcessor(processor),
 					sdklog.WithResource(o.res),
 				)
 				global.SetLoggerProvider(logProvider)
@@ -66,6 +92,9 @@ func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
 			OnStop: func(ctx context.Context) error {
 				if err := log.provider.Shutdown(ctx); err != nil {
 					return err
+				}
+				if log.file != nil {
+					log.file.Close()
 				}
 				f.log("LOGGER", "Stopped")
 				return nil
