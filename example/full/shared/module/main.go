@@ -35,9 +35,9 @@ func Module() *fluxgo.FluxGo {
 	flux.AddRedis(fluxgo.RedisOptions{Options: redis.Options{Addr: env.Redis.Addr}})
 	flux.AddKafka(env.Kafka.GetConfig())
 	flux.AddCron()
-	flux.AddHttp(fluxgo.HttpOptions{Port: 3333, LogRequest: true, AddHealthRoutes: true}, func(http *fluxgo.Http) {
-		http.CreateRouter("/public", middlewareExample())
-		http.CreateRouter("/internal", middlewareExample())
+	flux.AddHttp(fluxgo.HttpOptions{Port: 3333, LogRequest: true, AddHealthRoutes: true}, func(data fluxgo.HttpConfigData) {
+		data.CreateRouter("/public", middlewareExample())
+		data.CreateRouter("/internal", middlewareExample())
 	})
 	flux.AddTools()
 

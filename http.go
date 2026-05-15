@@ -16,7 +16,13 @@ import (
 	"go.uber.org/fx"
 )
 
-type HttpConfig func(*Http)
+type HttpConfig func(HttpConfigData)
+type HttpConfigData struct {
+	*Http
+
+	Apm        *Apm        `optional:"true"`
+	Prometheus *Prometheus `optional:"true"`
+}
 
 type HttpParams struct {
 	fx.In
@@ -68,14 +74,18 @@ func (f *FluxGo) AddHttp(opt HttpOptions, configApp HttpConfig) *FluxGo {
 
 		http.GetValidator()
 
-		configApp(http)
+		configApp(HttpConfigData{
+			Http:       http,
+			Apm:        params.Apm,
+			Prometheus: params.Prometheus,
+		})
 
 		return http
 	})
 	f.AddInvoke(func(lc fx.Lifecycle, http *Http) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				if err := http.Start(ctx); err != nil {
+				if err := http.start(ctx); err != nil {
 					return err
 				}
 				f.log("HTTP", fmt.Sprintf("Running on port %d", http.port))
@@ -83,7 +93,7 @@ func (f *FluxGo) AddHttp(opt HttpOptions, configApp HttpConfig) *FluxGo {
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				if err := http.Stop(ctx); err != nil {
+				if err := http.stop(ctx); err != nil {
 					return err
 				}
 				f.log("HTTP", "Stopped")
@@ -119,7 +129,7 @@ type HttpOptions struct {
 	FiberConfig fiber.Config
 }
 
-func (h *Http) Start(ctx context.Context) error {
+func (h *Http) start(ctx context.Context) error {
 	errCh := make(chan error, 1)
 
 	go func() {
@@ -158,7 +168,7 @@ func (h *Http) Start(ctx context.Context) error {
 		return ctx.Err()
 	}
 }
-func (h *Http) Stop(ctx context.Context) error {
+func (h *Http) stop(ctx context.Context) error {
 	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
