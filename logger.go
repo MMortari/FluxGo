@@ -106,5 +106,5 @@ func (li *LoggerInstance) Error(msg string, attrs ...slog.Attr) {
 	li.LogAttrs(li.ctx, slog.LevelError, msg, attrs...)
 }
 func (li *LoggerInstance) Errorf(format string, a ...any) {
-	li.Log(li.ctx, slog.LevelError, fmt.Sprintf(format, a...))
+	li.Log(li.ctx, slog.LevelError, fmt.Errorf(format, a...).Error())
 }
