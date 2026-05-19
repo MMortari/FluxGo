@@ -8,6 +8,7 @@ import (
 	"log"
 
 	"github.com/IBM/sarama"
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -180,7 +181,7 @@ func (k *Kafka) ProduceMessage(ctx context.Context, topic string, data sarama.En
 		spanAtt = append(spanAtt, attribute.String("messaging.kafka.message.key", *key))
 	}
 
-	_, span := k.apm.StartSpan(ctx, "event/kafka/produceMessage", trace.WithAttributes(spanAtt...))
+	ctx, span := k.apm.StartSpan(ctx, "event/kafka/produceMessage", trace.WithAttributes(spanAtt...), trace.WithSpanKind(trace.SpanKindProducer))
 	defer span.End()
 
 	message := &sarama.ProducerMessage{
@@ -191,6 +192,10 @@ func (k *Kafka) ProduceMessage(ctx context.Context, topic string, data sarama.En
 	if key != nil {
 		message.Key = sarama.StringEncoder(*key)
 	}
+
+	carrier := &kafkaProducerCarrier{}
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+	message.Headers = carrier.headers
 
 	if _, _, err := k.producer.SendMessage(message); err != nil {
 		span.SetError(err)
@@ -252,14 +257,19 @@ func (h ConsumerGroup) ConsumeClaim(session sarama.ConsumerGroupSession, claim s
 	return nil
 }
 func (h *ConsumerGroup) handleMessage(msg *sarama.ConsumerMessage, session sarama.ConsumerGroupSession) {
-	ctx, span := h.apm.StartSpan(context.Background(), msg.Topic, trace.WithAttributes(
-		attribute.String("messaging.system", "kafka"),
-		attribute.Int64("messaging.kafka.offset", msg.Offset),
-		attribute.String("messaging.kafka.message.key", string(msg.Key)),
-		attribute.String("messaging.destination.name", msg.Topic),
-		attribute.String("messaging.operation.name", "process"),
-		attribute.String("messaging.operation.type", "process"),
-	))
+	parentCtx := otel.GetTextMapPropagator().Extract(context.Background(), kafkaConsumerCarrier(msg.Headers))
+
+	ctx, span := h.apm.StartSpan(parentCtx, msg.Topic,
+		trace.WithSpanKind(trace.SpanKindConsumer),
+		trace.WithAttributes(
+			attribute.String("messaging.system", "kafka"),
+			attribute.Int64("messaging.kafka.offset", msg.Offset),
+			attribute.String("messaging.kafka.message.key", string(msg.Key)),
+			attribute.String("messaging.destination.name", msg.Topic),
+			attribute.String("messaging.operation.name", "process"),
+			attribute.String("messaging.operation.type", "process"),
+		),
+	)
 	defer span.End()
 
 	if consumer := h.getHandler(msg.Topic); consumer != nil {
@@ -281,4 +291,53 @@ func (h *ConsumerGroup) getHandler(topic string) *Consumer {
 	}
 
 	return nil
+}
+
+// kafkaProducerCarrier wraps []sarama.RecordHeader for OTel inject (producer side).
+type kafkaProducerCarrier struct {
+	headers []sarama.RecordHeader
+}
+
+func (c *kafkaProducerCarrier) Get(key string) string {
+	for _, h := range c.headers {
+		if string(h.Key) == key {
+			return string(h.Value)
+		}
+	}
+	return ""
+}
+func (c *kafkaProducerCarrier) Set(key, value string) {
+	c.headers = append(c.headers, sarama.RecordHeader{
+		Key:   []byte(key),
+		Value: []byte(value),
+	})
+}
+func (c *kafkaProducerCarrier) Keys() []string {
+	keys := make([]string, 0, len(c.headers))
+	for _, h := range c.headers {
+		keys = append(keys, string(h.Key))
+	}
+	return keys
+}
+
+// kafkaConsumerCarrier wraps []*sarama.RecordHeader for OTel extract (consumer side).
+type kafkaConsumerCarrier []*sarama.RecordHeader
+
+func (c kafkaConsumerCarrier) Get(key string) string {
+	for _, h := range c {
+		if h != nil && string(h.Key) == key {
+			return string(h.Value)
+		}
+	}
+	return ""
+}
+func (c kafkaConsumerCarrier) Set(key, value string) {}
+func (c kafkaConsumerCarrier) Keys() []string {
+	keys := make([]string, 0, len(c))
+	for _, h := range c {
+		if h != nil {
+			keys = append(keys, string(h.Key))
+		}
+	}
+	return keys
 }
