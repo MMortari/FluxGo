@@ -113,8 +113,7 @@ type otelTransport struct {
 }
 
 func (t *otelTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	ctx := req.Context()
-	if trace.SpanFromContext(ctx).SpanContext().IsValid() {
+	if ctx := req.Context(); trace.SpanFromContext(ctx).SpanContext().IsValid() {
 		req = req.Clone(ctx)
 		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
 	}
