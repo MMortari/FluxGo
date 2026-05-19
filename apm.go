@@ -3,6 +3,7 @@ package fluxgo
 import (
 	"context"
 	"fmt"
+	"net/http"
 
 	"github.com/gofiber/contrib/otelfiber/v2"
 	"github.com/gofiber/fiber/v2"
@@ -11,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
@@ -42,6 +44,10 @@ func (f *FluxGo) AddApm() *FluxGo {
 					sdktrace.WithResource(o.res),
 				)
 				otel.SetTracerProvider(traceProvider)
+				otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+					propagation.TraceContext{},
+					propagation.Baggage{},
+				))
 
 				tracer := traceProvider.Tracer(f.GetCleanName())
 
@@ -100,4 +106,25 @@ func (apm Apm) GetSpanFromContext(ctx context.Context) Span {
 
 func SetAttributes(attributes ...attribute.KeyValue) trace.SpanStartEventOption {
 	return trace.WithAttributes(attributes...)
+}
+
+type otelTransport struct {
+	base http.RoundTripper
+}
+
+func (t *otelTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	ctx := req.Context()
+	if trace.SpanFromContext(ctx).SpanContext().IsValid() {
+		req = req.Clone(ctx)
+		otel.GetTextMapPropagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+	}
+	return t.base.RoundTrip(req)
+}
+
+// NewHttpClient returns an http.Client that injects W3C traceparent headers
+// into outbound requests, enabling trace propagation to downstream services.
+func (apm Apm) NewHttpClient() *http.Client {
+	return &http.Client{
+		Transport: &otelTransport{base: http.DefaultTransport},
+	}
 }
