@@ -329,7 +329,7 @@ func (o *Database) RunTransaction(pCtx context.Context, handler func(ctx context
 	ctx, span := o.apm.StartSpan(pCtx, "repositories/transaction")
 	defer span.End()
 
-	tx, err := o.ReadOnlyDB().BeginTxx(pCtx, nil)
+	tx, err := o.ReadOnlyDB().BeginTxx(ctx, nil)
 	if err != nil {
 		span.SetError(err)
 		return err
