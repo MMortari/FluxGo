@@ -2,6 +2,13 @@
 
 A Golang framework for fast development reliable applications.
 
+## Skills
+
+```sh
+mkdir -p .claude/skills/fluxgo
+curl -fsSL https://raw.githubusercontent.com/MMortari/FluxGo/main/.claude/skills/fluxgo/SKILL.md -o .claude/skills/fluxgo/SKILL.md
+```
+
 ## Example
 
 Flux was created to easily create applications with pre-built capability, like:
