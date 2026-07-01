@@ -61,7 +61,7 @@ func (f *FluxGo) AddGrpc(opts GrpcOptions) *FluxGo {
 			OnStart: func(ctx context.Context) error {
 				lis, err := net.Listen("tcp", fmt.Sprintf(":%d", g.opts.Port))
 				if err != nil {
-					return err
+					return fmt.Errorf("failed to bind gRPC port %d: %w", g.opts.Port, err)
 				}
 
 				go func() {
