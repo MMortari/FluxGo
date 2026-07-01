@@ -63,13 +63,32 @@ func (f *FluxGo) AddGrpc(opts GrpcOptions) *FluxGo {
 				if err != nil {
 					return err
 				}
-				go g.server.Serve(lis) //nolint:errcheck
+
+				go func() {
+					if err := g.server.Serve(lis); err != nil && err != grpc.ErrServerStopped {
+						f.log("GRPC", fmt.Sprintf("Server error: %v", err))
+					}
+				}()
+
 				f.log("GRPC", fmt.Sprintf("Started on port %d", g.opts.Port))
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				g.server.GracefulStop()
+				done := make(chan struct{})
+
+				go func() {
+					g.server.GracefulStop()
+					close(done)
+				}()
+
+				select {
+				case <-done:
+				case <-ctx.Done():
+					g.server.Stop()
+				}
+
 				f.log("GRPC", "Stopped")
+
 				return nil
 			},
 		})
