@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/fx"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -35,7 +36,9 @@ type GrpcHandlerInterface interface {
 // Handlers are registered via GrpcDef in each FluxModule.
 func (f *FluxGo) AddGrpc(opts GrpcOptions) *FluxGo {
 	f.AddDependency(func() *Grpc {
-		serverOpts := []grpc.ServerOption{}
+		serverOpts := []grpc.ServerOption{
+			grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		}
 
 		if len(opts.Interceptors) > 0 {
 			serverOpts = append(serverOpts, grpc.ChainUnaryInterceptor(opts.Interceptors...))
