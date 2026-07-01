@@ -90,7 +90,7 @@ func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
 
 				log.provider = logProvider
 
-				f.log("LOGGER", "Started")
+				f.Log("LOGGER", "Started")
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
@@ -102,7 +102,7 @@ func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
 						return err
 					}
 				}
-				f.log("LOGGER", "Stopped")
+				f.Log("LOGGER", "Stopped")
 				return nil
 			},
 		})

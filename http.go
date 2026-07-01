@@ -88,7 +88,7 @@ func (f *FluxGo) AddHttp(opt HttpOptions, configApp HttpConfig) *FluxGo {
 				if err := http.start(ctx); err != nil {
 					return err
 				}
-				f.log("HTTP", fmt.Sprintf("Running on port %d", http.port))
+				f.Log("HTTP", fmt.Sprintf("Running on port %d", http.port))
 
 				return nil
 			},
@@ -96,7 +96,7 @@ func (f *FluxGo) AddHttp(opt HttpOptions, configApp HttpConfig) *FluxGo {
 				if err := http.stop(ctx); err != nil {
 					return err
 				}
-				f.log("HTTP", "Stopped")
+				f.Log("HTTP", "Stopped")
 
 				return nil
 			},

@@ -54,14 +54,14 @@ func (f *FluxGo) AddApm() *FluxGo {
 				apm.TraceProvider = traceProvider
 				apm.Tracer = &tracer
 
-				f.log("APM", "Started")
+				f.Log("APM", "Started")
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
 				if err := apm.TraceProvider.Shutdown(ctx); err != nil {
 					return err
 				}
-				f.log("APM", "Stopped")
+				f.Log("APM", "Stopped")
 				return nil
 			},
 		})

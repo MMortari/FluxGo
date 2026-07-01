@@ -28,14 +28,14 @@ func (f *FluxGo) AddRedis(opt RedisOptions) *FluxGo {
 				if err := redis.connect(ctx); err != nil {
 					return err
 				}
-				f.log("REDIS", "Connected")
+				f.Log("REDIS", "Connected")
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
 				if err := redis.disconnect(); err != nil {
 					return err
 				}
-				f.log("REDIS", "Disconnected")
+				f.Log("REDIS", "Disconnected")
 				return nil
 			},
 		})

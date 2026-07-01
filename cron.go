@@ -37,7 +37,7 @@ func (f *FluxGo) AddCron() *FluxGo {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				cron.scheduler.Start()
-				f.log("CRON", "Started")
+				f.Log("CRON", "Started")
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
@@ -45,7 +45,7 @@ func (f *FluxGo) AddCron() *FluxGo {
 					return err
 				}
 				cron.cancel()
-				f.log("CRON", "Stopped")
+				f.Log("CRON", "Stopped")
 				return nil
 			},
 		})
