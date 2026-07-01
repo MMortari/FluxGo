@@ -26,6 +26,9 @@ project/
 │       │   └── {action}.go
 │       └── tests/            # Testes do módulo
 │           └── {action}_test.go
+├── proto/                     # Fontes .proto (versionadas no git)
+│   └── {service}/
+│       └── {service}.proto
 └── shared/                    # Recursos compartilhados
     ├── database/
     │   └── migrations/       # Migrações SQL
@@ -33,6 +36,10 @@ project/
     │       └── {version}_{name}.down.sql
     ├── entities/             # Entidades de domínio
     │   └── {entity}.go
+    ├── pb/                   # Código gerado pelo protoc (não editar)
+    │   └── {service}/
+    │       ├── {service}.pb.go
+    │       └── {service}_grpc.pb.go
     ├── repositories/          # Camada de acesso a dados
     │   └── {entity}.go
     ├── http/                 # Configuração HTTP
@@ -672,6 +679,15 @@ test:
 
 migrations:
 	go run cmd/migrations/run.go
+
+proto:
+	protoc \
+		--go_out=shared/pb \
+		--go_opt=paths=source_relative \
+		--go-grpc_out=shared/pb \
+		--go-grpc_opt=paths=source_relative \
+		-I proto \
+		proto/{service}/{service}.proto
 ```
 
 **Padrão**:
@@ -680,6 +696,7 @@ migrations:
 - `run`: executa a aplicação
 - `test`: executa testes com variável de ambiente
 - `migrations`: executa migrações
+- `proto`: regenera código Go a partir dos arquivos `.proto` (requer `protoc`, `protoc-gen-go` e `protoc-gen-go-grpc`)
 
 ---
 
@@ -706,7 +723,66 @@ content-type: application/json
 
 ---
 
-### 16. Tools
+### 16. Handler gRPC (`modules/{module}/handlers/grpc.go`)
+
+```go
+package handlers
+
+import (
+	"context"
+
+	fluxgo "github.com/MMortari/FluxGo"
+	userpb "github.com/MMortari/FluxGo/example/full/shared/pb/user"
+	"github.com/MMortari/FluxGo/example/full/shared/repositories"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+// HandlerUserGrpc embede UnimplementedUserServiceServer (gerado pelo protoc)
+// e implementa fluxgo.GrpcHandlerInterface via RegisterGrpc.
+type HandlerUserGrpc struct {
+	userpb.UnimplementedUserServiceServer
+	repository *repositories.UserRepository
+	logger     *fluxgo.Logger
+}
+
+func HandlerUserGrpcStart(repository *repositories.UserRepository, logger *fluxgo.Logger) *HandlerUserGrpc {
+	return &HandlerUserGrpc{repository: repository, logger: logger}
+}
+
+// Método gRPC — assinatura gerada pelo protoc
+func (h *HandlerUserGrpc) GetUser(ctx context.Context, req *userpb.GetUserRequest) (*userpb.GetUserResponse, error) {
+	user, err := h.repository.GetUser(ctx)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "error getting user")
+	}
+	if user == nil {
+		return nil, status.Errorf(codes.NotFound, "user not found")
+	}
+	return &userpb.GetUserResponse{
+		User: &userpb.User{Id: user.ID, Name: user.Name},
+	}, nil
+}
+
+// RegisterGrpc implementa fluxgo.GrpcHandlerInterface — chamado uma vez no startup
+func (h *HandlerUserGrpc) RegisterGrpc(server *grpc.Server) {
+	userpb.RegisterUserServiceServer(server, h)
+}
+```
+
+**Padrão**:
+
+- Struct embede `Unimplemented{Service}Server` do código gerado (garante forward-compatibility)
+- Métodos gRPC seguem assinatura gerada pelo protoc: `(ctx, *Req) (*Res, error)`
+- `RegisterGrpc` é o único método específico do FluxGo — delega para `Register{Service}Server`
+- Erros retornam `status.Errorf(codes.X, msg)` (padrão gRPC), não `*GlobalError`
+- Handler separado por transporte: `get-user.go` (HTTP/Cron/Kafka) + `grpc.go` (gRPC)
+- Registro no módulo: `AddHandler(HandlerUserGrpcStart)` + `Route(fluxgo.GrpcDef[HandlerUserGrpc]())`
+
+---
+
+### 17. Tools
 
 O projeto inclui um componente `Tools` para registro e exposição de ferramentas programáticas.
 
@@ -749,7 +825,7 @@ func (t *MyTool) ExecuteTool(ctx context.Context, raw json.RawMessage) (any, err
 - Fornecer schemas para validação/integração com provedores de funções.
 - Usar `GetOllamaTools()` para integração com provedores que esperam definições de funções.
 
-### 17. Configuração e Uso do Kafka
+### 18. Configuração e Uso do Kafka
 
 ### 1. Variáveis de Ambiente
 
@@ -872,9 +948,19 @@ HTTP Response
 - [ ] Criar/atualizar entity em `shared/entities/`
 - [ ] Criar/atualizar repository em `shared/repositories/`
 - [ ] Registrar handler no `module.go` com `AddHandler()`
-- [ ] Registrar rotas no `module.go` com `AddRoute()`
+- [ ] Registrar rotas no `module.go` com `AddRoute()` ou `Route(...)`
 - [ ] Registrar repository no `shared/module/main.go` com `AddDependency()`
 - [ ] Registrar módulo no `shared/module/main.go` com `AddModule()`
+
+### Checklist adicional para gRPC
+
+- [ ] Criar `proto/{service}/{service}.proto` com definição do serviço
+- [ ] Gerar código com `make proto` → `shared/pb/{service}/`
+- [ ] Criar `modules/{module}/handlers/grpc.go` com handler que embede `Unimplemented{Service}Server`
+- [ ] Implementar `RegisterGrpc(server *grpc.Server)` chamando `Register{Service}Server`
+- [ ] Registrar handler com `AddHandler({Handler}GrpcStart)`
+- [ ] Registrar rota com `Route(fluxgo.GrpcDef[{Handler}Grpc]())`
+- [ ] Chamar `flux.AddGrpc(fluxgo.GrpcOptions{Port: 50051})` no `shared/module/main.go`
 
 ## 📚 Referências
 

@@ -20,6 +20,7 @@ FluxGo is an open-source Go framework for building production-ready applications
 | Logging | slog + OpenTelemetry bridge | `ConfigLogger(opts)` |
 | Metrics | Prometheus | `AddPrometheus()` |
 | AI Tools | Ollama + JSON Schema | `AddTools()` |
+| gRPC Server | google.golang.org/grpc | `AddGrpc(opts)` |
 | DI Container | Uber fx | Built-in |
 
 ## Project Architecture
@@ -313,6 +314,55 @@ kafka.ProduceMessageJson(ctx, "topic", payload, nil)
 
 // Consume (registered via module)
 mod.TopicConsume(kafka, "topic", func(ctx context.Context, data []byte) error { ... })
+```
+
+## gRPC Usage
+
+```go
+// Setup — alongside AddHttp
+flux.AddGrpc(fluxgo.GrpcOptions{
+    Port:       50051,
+    Reflection: true, // enables grpcurl/Postman
+    Interceptors: []grpc.UnaryServerInterceptor{
+        myAuthInterceptor(),
+    },
+})
+
+// Handler — implements proto-generated service interface + GrpcHandlerInterface
+type HandlerUserGrpc struct {
+    userpb.UnimplementedUserServiceServer
+    repository *repositories.UserRepository
+}
+
+func HandlerUserGrpcStart(repo *repositories.UserRepository) *HandlerUserGrpc {
+    return &HandlerUserGrpc{repository: repo}
+}
+
+func (h *HandlerUserGrpc) GetUser(ctx context.Context, req *userpb.GetUserRequest) (*userpb.GetUserResponse, error) {
+    // business logic
+}
+
+// RegisterGrpc is the FluxGo hook — called once on startup
+func (h *HandlerUserGrpc) RegisterGrpc(server *grpc.Server) {
+    userpb.RegisterUserServiceServer(server, h)
+}
+
+// Module registration
+fluxgo.Module("user").
+    AddHandler(handlers.HandlerUserGrpcStart).
+    Route(
+        fluxgo.GrpcDef[handlers.HandlerUserGrpc](),
+    )
+```
+
+Proto files live in `proto/` and generated code in `shared/pb/`. Regenerate with:
+
+```bash
+protoc \
+  --go_out=shared/pb --go_opt=paths=source_relative \
+  --go-grpc_out=shared/pb --go-grpc_opt=paths=source_relative \
+  -I proto proto/user/user.proto
+# or: make proto
 ```
 
 ## AI Tools Integration
