@@ -91,11 +91,11 @@ func (f *FluxGo) AddKafka(data KafkaOptions) *FluxGo {
 	f.AddInvoke(func(lc fx.Lifecycle, kafka *Kafka) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				f.log("KAFKA", "Connected")
+				f.Log("KAFKA", "Connected")
 				return kafka.start()
 			},
 			OnStop: func(ctx context.Context) error {
-				f.log("KAFKA", "Disconnected")
+				f.Log("KAFKA", "Disconnected")
 				return kafka.stop()
 			},
 		})

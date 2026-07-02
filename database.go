@@ -89,14 +89,14 @@ func (f *FluxGo) AddDatabase(data DatabaseOptions) *FluxGo {
 					if err := db.Connect(ctx); err != nil {
 						return err
 					}
-					f.log("DATABASE", "Connected")
+					f.Log("DATABASE", "Connected")
 					return nil
 				},
 				OnStop: func(ctx context.Context) error {
 					if err := db.Disconnect(); err != nil {
 						return err
 					}
-					f.log("DATABASE", "Disconnected")
+					f.Log("DATABASE", "Disconnected")
 					return nil
 				},
 			})

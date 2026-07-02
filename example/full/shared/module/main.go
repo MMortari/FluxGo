@@ -18,7 +18,7 @@ func Module() *fluxgo.FluxGo {
 		Version:      "1",
 		Env:          &env.Env,
 		Debugger:     true,
-		FullDebugger: true,
+		FullDebugger: false,
 		Otel:         &fluxgo.OtelOptions{CollectorURL: env.Apm.CollectorUrl, Exporter: env.Apm.Exporter},
 	})
 	flux.AddApm()
@@ -40,6 +40,7 @@ func Module() *fluxgo.FluxGo {
 		data.CreateRouter("/internal", middlewareExample())
 	})
 	flux.AddTools()
+	flux.AddGrpc(fluxgo.GrpcOptions{Port: 50051, Reflection: true})
 
 	flux.AddDependency(repositories.UserRepositoryStart)
 

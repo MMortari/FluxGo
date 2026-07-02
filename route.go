@@ -158,6 +158,33 @@ func TopicDef[T any, PT interface {
 	}
 }
 
+// --- gRPC Routes ---
+
+type grpcRouteDef struct {
+	makeFn func(m *FluxModule) interface{}
+}
+
+func (d *grpcRouteDef) toFxOption(m *FluxModule) fx.Option {
+	return fx.Invoke(d.makeFn(m))
+}
+
+// GrpcDef creates a gRPC route definition that registers handler T on the gRPC server.
+// T must implement GrpcHandlerInterface; PT is the pointer type resolved from DI.
+// RegisterGrpc is called once during startup — it should call the proto-generated
+// RegisterXxxServer(server, handler) function.
+func GrpcDef[T any, PT interface {
+	*T
+	GrpcHandlerInterface
+}]() RouteDefinition {
+	return &grpcRouteDef{
+		makeFn: func(m *FluxModule) interface{} {
+			return func(g *Grpc, handler PT) error {
+				return m.GrpcRoute(g, handler)
+			}
+		},
+	}
+}
+
 // --- Tool Routes ---
 
 type toolRouteDef struct {

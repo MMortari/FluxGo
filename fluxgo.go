@@ -136,8 +136,8 @@ func (f *FluxGo) GetTestApp(t *testing.T) (*fxtest.App, *Http) {
 	return fxApp, http
 }
 
-func (f *FluxGo) log(key, message string) {
+func (f *FluxGo) Log(key, message string) {
 	if f.Debugger {
-		fmt.Printf("%s [%s]: %s\n", time.Now().Format(time.DateTime), key, message)
+		fmt.Printf("%s [%s] %s\n", time.Now().Format(time.DateTime), key, message)
 	}
 }

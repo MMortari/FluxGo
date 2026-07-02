@@ -112,6 +112,10 @@ func (m *FluxModule) TopicConsume(kafka *Kafka, topic string, handler MessageHan
 func (m *FluxModule) CronRoute(cron *Cron, crontab string, handler CronHandler) error {
 	return cron.Register(crontab, handler)
 }
+func (m *FluxModule) GrpcRoute(g *Grpc, handler GrpcHandlerInterface) error {
+	handler.RegisterGrpc(g.server)
+	return nil
+}
 func (m *FluxModule) ToolRoute(f *FluxGo, tools *Tools, handler ToolsInterface) error {
 	tools.AddTool(handler)
 	return nil
