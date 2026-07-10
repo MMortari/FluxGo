@@ -26,6 +26,23 @@ type Grpc struct {
 	opts   GrpcOptions
 }
 
+// GrpcClientOptions configures an outgoing gRPC client connection.
+type GrpcClientOptions struct {
+	// Extra dial options appended after the otelgrpc stats handler.
+	DialOptions []grpc.DialOption
+}
+
+// NewGrpcClient creates a gRPC client connection with OTEL trace propagation enabled.
+// Always use this instead of grpc.NewClient/grpc.Dial so the outgoing call carries
+// the current trace context and spans are linked across services.
+func NewGrpcClient(target string, opts GrpcClientOptions) (*grpc.ClientConn, error) {
+	dialOpts := []grpc.DialOption{
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+	}
+	dialOpts = append(dialOpts, opts.DialOptions...)
+	return grpc.NewClient(target, dialOpts...)
+}
+
 // GrpcHandlerInterface must be implemented by handlers registered via GrpcDef.
 // RegisterGrpc is called once during startup to register the proto service on the server.
 type GrpcHandlerInterface interface {
