@@ -3,7 +3,10 @@ package fluxgo
 import (
 	"context"
 	"sync"
+	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/host"
+	"go.opentelemetry.io/contrib/instrumentation/runtime"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
@@ -61,6 +64,16 @@ func (f *FluxGo) AddMetrics() *FluxGo {
 	})
 	f.AddInvoke(func(lc fx.Lifecycle, m *Metrics) error {
 		lc.Append(fx.Hook{
+			OnStart: func(ctx context.Context) error {
+				if err := runtime.Start(runtime.WithMinimumReadMemStatsInterval(10 * time.Second)); err != nil {
+					return err
+				}
+				if err := host.Start(); err != nil {
+					return err
+				}
+				f.Log("METRICS", "Started")
+				return nil
+			},
 			OnStop: func(ctx context.Context) error {
 				if m.Provider != nil {
 					if err := m.Provider.Shutdown(ctx); err != nil {
