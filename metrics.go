@@ -25,8 +25,8 @@ type Metrics struct {
 }
 
 func (f *FluxGo) AddMetrics() *FluxGo {
-	f.AddDependency(func() *Metrics {
-		return &Metrics{
+	f.AddDependency(func(o *Otel) *Metrics {
+		metrics := Metrics{
 			counterIntMap:     make(map[string]metric.Int64Counter),
 			counterFloatMap:   make(map[string]metric.Float64Counter),
 			histogramIntMap:   make(map[string]metric.Int64Histogram),
@@ -35,34 +35,32 @@ func (f *FluxGo) AddMetrics() *FluxGo {
 			gaugeFloatMap:     make(map[string]metric.Float64Gauge),
 			mutex:             sync.RWMutex{},
 		}
+
+		var exporter sdkmetric.Exporter
+		var err error
+
+		if o.grpcConnection != nil {
+			exporter, err = otlpmetricgrpc.New(context.Background(), otlpmetricgrpc.WithGRPCConn(o.grpcConnection))
+		} else {
+			exporter, err = stdoutmetric.New()
+		}
+		if err != nil {
+			panic(err)
+		}
+
+		meterProvider := sdkmetric.NewMeterProvider(
+			sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter)),
+			sdkmetric.WithResource(o.res),
+		)
+		otel.SetMeterProvider(meterProvider)
+
+		metrics.Provider = meterProvider
+		metrics.meter = meterProvider.Meter(f.GetCleanName())
+
+		return &metrics
 	})
-	f.AddInvoke(func(lc fx.Lifecycle, m *Metrics, o *Otel) error {
+	f.AddInvoke(func(lc fx.Lifecycle, m *Metrics) error {
 		lc.Append(fx.Hook{
-			OnStart: func(ctx context.Context) error {
-				var exporter sdkmetric.Exporter
-				var err error
-
-				if o.grpcConnection != nil {
-					exporter, err = otlpmetricgrpc.New(context.Background(), otlpmetricgrpc.WithGRPCConn(o.grpcConnection))
-				} else {
-					exporter, err = stdoutmetric.New()
-				}
-				if err != nil {
-					return err
-				}
-
-				meterProvider := sdkmetric.NewMeterProvider(
-					sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter)),
-					sdkmetric.WithResource(o.res),
-				)
-				otel.SetMeterProvider(meterProvider)
-
-				m.Provider = meterProvider
-				m.meter = meterProvider.Meter(f.GetCleanName())
-
-				f.Log("METRICS", "Started")
-				return nil
-			},
 			OnStop: func(ctx context.Context) error {
 				if m.Provider != nil {
 					if err := m.Provider.Shutdown(ctx); err != nil {

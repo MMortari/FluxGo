@@ -27,9 +27,16 @@ type OtelOptions struct {
 func (f *FluxGo) addOtel(opt OtelOptions) *FluxGo {
 	res := buildOtelResource(f)
 
-	otel := Otel{
-		res: res,
-		opt: opt,
+	otel := Otel{res: res, opt: opt}
+
+	if opt.Exporter == "grpc" {
+		conn, err := grpc.NewClient(opt.CollectorURL,
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			panic(err)
+		}
+		otel.grpcConnection = conn
 	}
 
 	f.otel = &otel
@@ -39,20 +46,6 @@ func (f *FluxGo) addOtel(opt OtelOptions) *FluxGo {
 	})
 	f.AddInvoke(func(lc fx.Lifecycle, o *Otel) error {
 		lc.Append(fx.Hook{
-			OnStart: func(ctx context.Context) error {
-				if o.opt.Exporter == "grpc" {
-					conn, err := grpc.NewClient(opt.CollectorURL,
-						grpc.WithTransportCredentials(insecure.NewCredentials()),
-					)
-					if err != nil {
-						return err
-					}
-
-					o.grpcConnection = conn
-				}
-
-				return nil
-			},
 			OnStop: func(ctx context.Context) error {
 				if o.grpcConnection != nil {
 					return o.grpcConnection.Close()
