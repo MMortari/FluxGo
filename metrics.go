@@ -6,7 +6,6 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
-	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.uber.org/fx"
@@ -39,14 +38,11 @@ func (f *FluxGo) AddMetrics() *FluxGo {
 	f.AddInvoke(func(lc fx.Lifecycle, m *Metrics, o *Otel) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				var exporter sdkmetric.Exporter
-				var err error
-
-				if o.grpcConnection != nil {
-					exporter, err = otlpmetricgrpc.New(context.Background(), otlpmetricgrpc.WithGRPCConn(o.grpcConnection))
-				} else {
-					exporter, err = stdoutmetric.New()
+				if o.grpcConnection == nil {
+					return nil
 				}
+
+				exporter, err := otlpmetricgrpc.New(context.Background(), otlpmetricgrpc.WithGRPCConn(o.grpcConnection))
 				if err != nil {
 					return err
 				}
@@ -64,8 +60,10 @@ func (f *FluxGo) AddMetrics() *FluxGo {
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				if err := m.Provider.Shutdown(ctx); err != nil {
-					return err
+				if m.Provider != nil {
+					if err := m.Provider.Shutdown(ctx); err != nil {
+						return err
+					}
 				}
 				f.Log("METRICS", "Stopped")
 				return nil
