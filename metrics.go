@@ -6,6 +6,7 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
+	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/metric"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.uber.org/fx"
@@ -20,7 +21,7 @@ type Metrics struct {
 	histogramFloatMap map[string]metric.Float64Histogram
 	gaugeIntMap       map[string]metric.Int64Gauge
 	gaugeFloatMap     map[string]metric.Float64Gauge
-	mutex             *sync.RWMutex
+	mutex             sync.RWMutex
 }
 
 func (f *FluxGo) AddMetrics() *FluxGo {
@@ -32,17 +33,20 @@ func (f *FluxGo) AddMetrics() *FluxGo {
 			histogramFloatMap: make(map[string]metric.Float64Histogram),
 			gaugeIntMap:       make(map[string]metric.Int64Gauge),
 			gaugeFloatMap:     make(map[string]metric.Float64Gauge),
-			mutex:             &sync.RWMutex{},
+			mutex:             sync.RWMutex{},
 		}
 	})
 	f.AddInvoke(func(lc fx.Lifecycle, m *Metrics, o *Otel) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				if o.grpcConnection == nil {
-					return nil
-				}
+				var exporter sdkmetric.Exporter
+				var err error
 
-				exporter, err := otlpmetricgrpc.New(context.Background(), otlpmetricgrpc.WithGRPCConn(o.grpcConnection))
+				if o.grpcConnection != nil {
+					exporter, err = otlpmetricgrpc.New(context.Background(), otlpmetricgrpc.WithGRPCConn(o.grpcConnection))
+				} else {
+					exporter, err = stdoutmetric.New()
+				}
 				if err != nil {
 					return err
 				}

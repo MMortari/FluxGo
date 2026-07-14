@@ -33,10 +33,14 @@ func (f *FluxGo) AddApm() *FluxGo {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
 				var traceExporter sdktrace.SpanExporter
+				var err error
 				if o.grpcConnection != nil {
-					traceExporter, _ = otlptracegrpc.New(context.Background(), otlptracegrpc.WithGRPCConn(o.grpcConnection))
+					traceExporter, err = otlptracegrpc.New(context.Background(), otlptracegrpc.WithGRPCConn(o.grpcConnection))
 				} else {
-					traceExporter, _ = stdouttrace.New()
+					traceExporter, err = stdouttrace.New()
+				}
+				if err != nil {
+					return err
 				}
 
 				traceProvider := sdktrace.NewTracerProvider(
