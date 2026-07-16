@@ -2,6 +2,7 @@ package module
 
 import (
 	"context"
+	"os"
 
 	fluxgo "github.com/MMortari/FluxGo"
 	"github.com/MMortari/FluxGo/example/full/config"
@@ -13,7 +14,11 @@ import (
 )
 
 func Module() *fluxgo.FluxGo {
-	env := fluxgo.ParseEnv[config.Env](fluxgo.EnvOptions{LoadFromFile: fluxgo.Pointer(".env.development"), Validate: true})
+	envFile := ".env.development"
+	if os.Getenv("ENV") == "test" {
+		envFile = ".env.test"
+	}
+	env := fluxgo.ParseEnv[config.Env](fluxgo.EnvOptions{LoadFromFile: fluxgo.Pointer(envFile), Validate: true})
 
 	flux := fluxgo.New(fluxgo.FluxGoConfig{
 		Name:         "Teste Full",
