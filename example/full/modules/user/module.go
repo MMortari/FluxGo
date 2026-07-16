@@ -12,7 +12,11 @@ func Module() *fluxgo.FluxModule {
 	return fluxgo.Module("user").
 		AddHandler(handlers.HandlerGetUserStart, handlers.HandlerUserGrpcStart).
 		Route(
-			fluxgo.GET[handlers.HandlerGetUser]("/public", "/user", fluxgo.RouteIncome{Entity: dto.GetUserReq{}, CacheTTL: time.Hour}),
+			fluxgo.GET[handlers.HandlerGetUser]("/public", "/user", fluxgo.RouteIncome{
+				Entity:     dto.GetUserReq{},
+				CacheTTL:   time.Hour,
+				Permission: &fluxgo.RoutePermission{Action: "read", Subject: "user"}},
+			),
 			fluxgo.GET[handlers.HandlerGetUser]("/public", "/user/:id_user", fluxgo.RouteIncome{Entity: dto.GetUserReq{}, CacheTTL: time.Hour}),
 			fluxgo.POST[handlers.HandlerGetUser]("/internal", "/refresh", fluxgo.RouteIncome{Entity: dto.GetUserReq{}, CacheInvalidate: []string{"/public/user"}}),
 			fluxgo.TopicDef[handlers.HandlerGetUser]("TEST"),

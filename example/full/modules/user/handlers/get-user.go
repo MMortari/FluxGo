@@ -11,17 +11,30 @@ import (
 	"github.com/MMortari/FluxGo/example/full/shared/repositories"
 	"github.com/gofiber/fiber/v2"
 	"github.com/prometheus/client_golang/prometheus"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 )
 
 type HandlerGetUser struct {
-	repository *repositories.UserRepository
-	tools      *fluxgo.Tools
-	prom       *fluxgo.Prometheus
-	logger     *fluxgo.Logger
+	repository  *repositories.UserRepository
+	tools       *fluxgo.Tools
+	prom        *fluxgo.Prometheus
+	metrics     *fluxgo.Metrics
+	logger      *fluxgo.Logger
+	http        *fluxgo.Http
+	getUserReqs metric.Int64Counter
 }
 
-func HandlerGetUserStart(repository *repositories.UserRepository, tools *fluxgo.Tools, prom *fluxgo.Prometheus, logger *fluxgo.Logger) *HandlerGetUser {
-	return &HandlerGetUser{repository, tools, prom, logger}
+func HandlerGetUserStart(repository *repositories.UserRepository, tools *fluxgo.Tools, prom *fluxgo.Prometheus, metrics *fluxgo.Metrics, http *fluxgo.Http, logger *fluxgo.Logger) *HandlerGetUser {
+	return &HandlerGetUser{
+		repository:  repository,
+		tools:       tools,
+		prom:        prom,
+		metrics:     metrics,
+		logger:      logger,
+		http:        http,
+		getUserReqs: metrics.NewIntCounter("get_user_requests_total", "Total de requests para buscar usuários"),
+	}
 }
 
 func (h *HandlerGetUser) Execute(ctx c.Context, data *dto.GetUserReq) (*dto.GetUserRes, *fluxgo.GlobalError) {
@@ -36,6 +49,8 @@ func (h *HandlerGetUser) Execute(ctx c.Context, data *dto.GetUserReq) (*dto.GetU
 		counter.With(prometheus.Labels{"user": data.IdUser}).Inc()
 	}
 
+	h.getUserReqs.Add(ctx, 1, metric.WithAttributes(attribute.String("user", data.IdUser)))
+
 	log.Infof("tool: %+v\n\n", tool)
 
 	user, err := h.repository.GetUser(ctx)
@@ -45,7 +60,7 @@ func (h *HandlerGetUser) Execute(ctx c.Context, data *dto.GetUserReq) (*dto.GetU
 	if user == nil {
 		return nil, fluxgo.ErrorNotFound("User not found")
 	}
-	return &dto.GetUserRes{User: *user}, nil
+	return &dto.GetUserRes{User: *user, Permissions: h.http.GetPermissions(ctx)}, nil
 }
 
 func (h *HandlerGetUser) Name() string {

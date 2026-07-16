@@ -1,6 +1,8 @@
 package module
 
 import (
+	"context"
+
 	fluxgo "github.com/MMortari/FluxGo"
 	"github.com/MMortari/FluxGo/example/full/config"
 	"github.com/MMortari/FluxGo/example/full/modules/user"
@@ -22,6 +24,7 @@ func Module() *fluxgo.FluxGo {
 		Otel:         &fluxgo.OtelOptions{CollectorURL: env.Apm.CollectorUrl, Exporter: env.Apm.Exporter},
 	})
 	flux.AddApm()
+	flux.AddMetrics()
 	flux.ConfigLogger(fluxgo.LoggerOptions{Type: env.Logger.Type, Level: env.Logger.Level, LogFilePath: env.Logger.FilePath})
 
 	prom := flux.AddPrometheus()
@@ -35,7 +38,7 @@ func Module() *fluxgo.FluxGo {
 	flux.AddRedis(fluxgo.RedisOptions{Options: redis.Options{Addr: env.Redis.Addr}})
 	flux.AddKafka(env.Kafka.GetConfig())
 	flux.AddCron()
-	flux.AddHttp(fluxgo.HttpOptions{Port: 3333, LogRequest: true, AddHealthRoutes: true}, func(data fluxgo.HttpConfigData) {
+	flux.AddHttp(fluxgo.HttpOptions{Port: 3333, LogRequest: true, AddHealthRoutes: true, Permissions: getPermissions()}, func(data fluxgo.HttpConfigData) {
 		data.CreateRouter("/public", middlewareExample())
 		data.CreateRouter("/internal", middlewareExample())
 	})
@@ -51,6 +54,21 @@ func Module() *fluxgo.FluxGo {
 
 func middlewareExample() fiber.Handler {
 	return func(c *fiber.Ctx) error {
+		newCtx := context.WithValue(c.UserContext(), fluxgo.RoleContextKey, "view")
+		c.SetUserContext(newCtx)
+
 		return c.Next()
+	}
+}
+
+func getPermissions() *fluxgo.Permissions {
+	return &fluxgo.Permissions{
+		"admin": []fluxgo.PermissionRule{
+			{Action: "manage", Subject: "all"},
+		},
+		"view": []fluxgo.PermissionRule{
+			{Action: "read", Subject: "user"},
+			{Action: "read", Subject: "bill"},
+		},
 	}
 }
