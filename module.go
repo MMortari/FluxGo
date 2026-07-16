@@ -34,6 +34,10 @@ func (f *FluxModule) AddHandler(constructors ...interface{}) *FluxModule {
 	return f
 }
 
+type RoutePermission struct {
+	Action  string
+	Subject string
+}
 type RouteIncome struct {
 	Entity          EntityData
 	FromBody        bool
@@ -44,6 +48,7 @@ type RouteIncome struct {
 	Cache           ICache
 	CacheTTL        time.Duration
 	CacheInvalidate []string
+	Permission      *RoutePermission
 }
 type EntityData any
 
@@ -73,6 +78,26 @@ func (f *FluxModule) Route(defs ...RouteDefinition) *FluxModule {
 func (m *FluxModule) HttpRoute(f *FluxGo, http *Http, apm *Apm, group string, method string, path string, config RouteIncome, handler HttpHandler) error {
 	fun := func(c *fiber.Ctx) error {
 		ctx := c.UserContext()
+
+		if config.Permission != nil {
+			role, _ := ctx.Value(RoleContextKey).(string)
+			if role == "" {
+				return c.Status(fiber.StatusUnauthorized).JSON(&GlobalError{
+					Message: "Unauthorized",
+					Code:    "error.unauthorized",
+					Status:  fiber.StatusUnauthorized,
+					Success: false,
+				})
+			}
+			if http.permissions == nil || !http.permissions.Can(role, config.Permission.Action, config.Permission.Subject) {
+				return c.Status(fiber.StatusForbidden).JSON(&GlobalError{
+					Message: "Forbidden",
+					Code:    "error.forbidden",
+					Status:  fiber.StatusForbidden,
+					Success: false,
+				})
+			}
+		}
 
 		if cacheRes := config.cache(ctx, f, apm, config, config.cacheKey(c, f.GetCleanName())); cacheRes != nil {
 			return c.Status(200).Send([]byte(*cacheRes))

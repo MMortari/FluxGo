@@ -66,7 +66,7 @@ func (f *FluxGo) AddHttp(opt HttpOptions, configApp HttpConfig) *FluxGo {
 			})
 		}
 
-		http := &Http{app: app, port: opt.Port, routers: make(map[string]*fiber.Router)}
+		http := &Http{app: app, port: opt.Port, routers: make(map[string]*fiber.Router), permissions: opt.Permissions}
 
 		if params.Prometheus != nil {
 			http.app.Use(params.Prometheus.Middleware(app, "/metrics"))
@@ -113,10 +113,52 @@ type Validator struct {
 }
 
 type Http struct {
-	port      int
-	app       *fiber.App
-	routers   map[string]*fiber.Router
-	validator *Validator
+	port        int
+	app         *fiber.App
+	routers     map[string]*fiber.Router
+	validator   *Validator
+	permissions *Permissions
+}
+
+func (h *Http) GetPermissions(ctx context.Context) []PermissionRule {
+	if role := ctx.Value(RoleContextKey); role != nil && h.permissions != nil {
+		return h.permissions.Get(role.(string))
+	}
+
+	return nil
+}
+
+type contextKey string
+
+const RoleContextKey contextKey = "role"
+
+type PermissionRule struct {
+	Action  string `json:"action"`
+	Subject string `json:"subject"`
+}
+type Permissions map[string][]PermissionRule
+
+func (perm Permissions) Get(role string) []PermissionRule {
+	rules, exists := perm[role]
+	if !exists {
+		return []PermissionRule{}
+	}
+
+	return rules
+}
+func (perm Permissions) Can(role, action, subject string) bool {
+	rules, exists := perm[role]
+	if !exists {
+		return false
+	}
+
+	for _, rule := range rules {
+		if (rule.Action == action || rule.Action == "manage") && (rule.Subject == subject || rule.Subject == "all") {
+			return true
+		}
+	}
+
+	return false
 }
 
 type HttpOptions struct {
@@ -124,6 +166,7 @@ type HttpOptions struct {
 	ConfigApp       func(*fiber.App)
 	LogRequest      bool
 	AddHealthRoutes bool
+	Permissions     *Permissions
 
 	Cors        *cors.Config
 	FiberConfig fiber.Config
