@@ -38,6 +38,20 @@ type RoutePermission struct {
 	Action  string
 	Subject string
 }
+
+// RouteDoc holds OpenAPI 3.0 documentation metadata for a single route.
+// All fields are optional — omit to use inferred defaults.
+type RouteDoc struct {
+	Summary         string   // short one-liner shown as the operation title in Swagger UI
+	Description     string   // long markdown description of the operation
+	OperationId     string   // unique operation identifier (useful for code generators)
+	Deprecated      bool     // marks the route as deprecated in the spec
+	Tags            []string // overrides the default tag (module name)
+	OkResponse          any // zero value of response DTO — generates 200 response schema
+	CreatedResponse     any // zero value of response DTO — generates 201 response schema
+	BadRequestResponse  any // zero value of error DTO   — generates 400 response schema
+}
+
 type RouteIncome struct {
 	Entity          EntityData
 	FromBody        bool
@@ -49,6 +63,7 @@ type RouteIncome struct {
 	CacheTTL        time.Duration
 	CacheInvalidate []string
 	Permission      *RoutePermission
+	Doc             *RouteDoc
 }
 type EntityData any
 
@@ -128,6 +143,18 @@ func (m *FluxModule) HttpRoute(f *FluxGo, http *Http, apm *Apm, group string, me
 	} else {
 		(*r).Add(method, path, fun)
 	}
+
+	http.addRouteDoc(routeDoc{
+		method:     method,
+		path:       fmt.Sprintf("%s%s", group, path),
+		tags:       []string{m.Name},
+		doc:        config.Doc,
+		entity:     config.Entity,
+		fromBody:   config.FromBody,
+		fromQuery:  config.FromQuery,
+		fromParam:  config.FromParam,
+		fromHeader: config.FromHeader,
+	})
 
 	return nil
 }

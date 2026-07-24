@@ -80,6 +80,25 @@ func (f *FluxGo) AddHttp(opt HttpOptions, configApp HttpConfig) *FluxGo {
 			Prometheus: params.Prometheus,
 		})
 
+		if opt.Swagger != nil {
+			swOpts := *opt.Swagger
+			if swOpts.Path == "" {
+				swOpts.Path = "/swagger"
+			}
+			title := swOpts.Title
+			if title == "" {
+				title = f.Name
+			}
+			specPath := swOpts.Path + "/openapi.json"
+			http.app.Get(swOpts.Path, func(c *fiber.Ctx) error {
+				c.Set("Content-Type", "text/html; charset=utf-8")
+				return c.SendString(swaggerUIHTML(specPath))
+			})
+			http.app.Get(specPath, func(c *fiber.Ctx) error {
+				return c.JSON(http.buildOpenAPISpec(title, f.Version, swOpts.Description))
+			})
+		}
+
 		return http
 	})
 	f.AddInvoke(func(lc fx.Lifecycle, http *Http) error {
@@ -118,6 +137,7 @@ type Http struct {
 	routers     map[string]*fiber.Router
 	validator   *Validator
 	permissions *Permissions
+	docs        []routeDoc
 }
 
 func (h *Http) GetPermissions(ctx context.Context) []PermissionRule {
@@ -167,6 +187,7 @@ type HttpOptions struct {
 	LogRequest      bool
 	AddHealthRoutes bool
 	Permissions     *Permissions
+	Swagger         *SwaggerOptions
 
 	Cors        *cors.Config
 	FiberConfig fiber.Config
