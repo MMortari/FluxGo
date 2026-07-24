@@ -43,7 +43,13 @@ func Module() *fluxgo.FluxGo {
 	flux.AddRedis(fluxgo.RedisOptions{Options: redis.Options{Addr: env.Redis.Addr}})
 	flux.AddKafka(env.Kafka.GetConfig())
 	flux.AddCron()
-	flux.AddHttp(fluxgo.HttpOptions{Port: 3333, LogRequest: true, AddHealthRoutes: true, Permissions: getPermissions()}, func(data fluxgo.HttpConfigData) {
+	flux.AddHttp(fluxgo.HttpOptions{
+		Port:            3333,
+		LogRequest:      true,
+		AddHealthRoutes: true,
+		Permissions:     getPermissions(),
+		Swagger:         &fluxgo.SwaggerOptions{Description: "API de exemplo do FluxGo"},
+	}, func(data fluxgo.HttpConfigData) {
 		data.CreateRouter("/public", middlewareExample())
 		data.CreateRouter("/internal", middlewareExample())
 	})

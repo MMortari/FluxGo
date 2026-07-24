@@ -1,8 +1,8 @@
 package entities
 
 type User struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID   string `json:"id" jsonschema:"title=Identificador do usuário"`
+	Name string `json:"name" jsonschema:"title=Nome"`
 }
 
 func (u User) TableName() string {

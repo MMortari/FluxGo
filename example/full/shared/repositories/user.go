@@ -33,3 +33,23 @@ func (r *UserRepository) GetUser(ctx context.Context) (*entities.User, error) {
 
 	return &user, nil
 }
+
+type UserFilter struct {
+	IdUser *string
+	Name   *string
+}
+
+func (r *UserRepository) ListUser(ctx context.Context, filter *UserFilter) ([]entities.User, error) {
+	ctx, span := r.StartSpan(ctx)
+	defer span.End()
+
+	query := "SELECT '299f3dcd-42f3-46c1-89d5-603c78a78f50' as id, 'John' AS name"
+
+	users := make([]entities.User, 0)
+	if err := r.DB.ReadOnlyDB().SelectContext(ctx, &users, query); err != nil {
+		span.SetError(err)
+		return nil, err
+	}
+
+	return users, nil
+}
