@@ -266,14 +266,6 @@ func (h *Http) buildOpenAPISpec(title, version, description string) map[string]a
 	return spec
 }
 
-// jsonFieldName returns the JSON key for a struct field (respects json tag).
-func jsonFieldName(f reflect.StructField) string {
-	if name := tagValue(f, "json"); name != "" {
-		return name
-	}
-	return strings.ToLower(f.Name)
-}
-
 // buildParam builds an OpenAPI parameter object.
 // description is hoisted to the parameter level (not inside schema).
 func buildParam(name, in string, required bool, f reflect.StructField) map[string]any {
@@ -316,8 +308,8 @@ func extractJsonSchemaMeta(f reflect.StructField) map[string]any {
 		if len(kv) != 2 {
 			continue
 		}
-		key, val := strings.TrimSpace(kv[0]), strings.TrimSpace(kv[1])
-		switch key {
+
+		switch key, val := strings.TrimSpace(kv[0]), strings.TrimSpace(kv[1]); key {
 		case "description", "title", "pattern", "format", "example", "default":
 			props[key] = val
 		case "minimum", "maximum", "minLength", "maxLength", "multipleOf", "exclusiveMinimum", "exclusiveMaximum":
