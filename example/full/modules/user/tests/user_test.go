@@ -42,7 +42,7 @@ func TestSwagger(t *testing.T) {
 		// GET /public/user tem tag "user"
 		get := fluxgo.ConvertToMap(fluxgo.ConvertToMap(paths["/public/user"])["get"])
 		tags := get["tags"].([]interface{})
-		assert.Equal(t, "user", tags[0])
+		assert.Equal(t, "Usuário", tags[0])
 
 		// /public/user/{id_user} tem path param id_user
 		getParam := fluxgo.ConvertToMap(fluxgo.ConvertToMap(paths["/public/user/{id_user}"])["get"])
