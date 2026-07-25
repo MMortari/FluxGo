@@ -11,15 +11,43 @@ import (
 	"go.uber.org/fx"
 )
 
+// ModuleOption configures a FluxModule. Use WithSwagger to add Swagger metadata.
+type ModuleOption interface {
+	applyModuleOption(m *FluxModule)
+}
+
+type moduleOptionFunc func(m *FluxModule)
+
+func (f moduleOptionFunc) applyModuleOption(m *FluxModule) { f(m) }
+
+// SwaggerModuleTag holds OpenAPI top-level tag metadata for a module.
+type SwaggerModuleTag struct {
+	Title       string
+	Description string
+}
+
+// WithSwagger configures Swagger/OpenAPI tag metadata for the module.
+// The tag name is the module name; Description appears in Swagger UI.
+func WithSwagger(tag SwaggerModuleTag) ModuleOption {
+	return moduleOptionFunc(func(m *FluxModule) {
+		m.swaggerTag = &tag
+	})
+}
+
 type FluxModule struct {
 	Name string
 
 	dependencies []fx.Option
 	invokes      []fx.Option
+	swaggerTag   *SwaggerModuleTag
 }
 
-func Module(name string) *FluxModule {
-	return &FluxModule{name, make([]fx.Option, 0), make([]fx.Option, 0)}
+func Module(name string, opts ...ModuleOption) *FluxModule {
+	m := &FluxModule{name, make([]fx.Option, 0), make([]fx.Option, 0), nil}
+	for _, opt := range opts {
+		opt.applyModuleOption(m)
+	}
+	return m
 }
 
 func (f *FluxModule) toFx() fx.Option {
@@ -42,14 +70,14 @@ type RoutePermission struct {
 // RouteDoc holds OpenAPI 3.0 documentation metadata for a single route.
 // All fields are optional — omit to use inferred defaults.
 type RouteDoc struct {
-	Summary         string   // short one-liner shown as the operation title in Swagger UI
-	Description     string   // long markdown description of the operation
-	OperationId     string   // unique operation identifier (useful for code generators)
-	Deprecated      bool     // marks the route as deprecated in the spec
-	Tags            []string // overrides the default tag (module name)
-	OkResponse          any // zero value of response DTO — generates 200 response schema
-	CreatedResponse     any // zero value of response DTO — generates 201 response schema
-	BadRequestResponse  any // zero value of error DTO   — generates 400 response schema
+	Summary            string   // short one-liner shown as the operation title in Swagger UI
+	Description        string   // long markdown description of the operation
+	OperationId        string   // unique operation identifier (useful for code generators)
+	Deprecated         bool     // marks the route as deprecated in the spec
+	Tags               []string // overrides the default tag (module name)
+	OkResponse         any      // zero value of response DTO — generates 200 response schema
+	CreatedResponse    any      // zero value of response DTO — generates 201 response schema
+	BadRequestResponse any      // zero value of error DTO   — generates 400 response schema
 }
 
 type RouteIncome struct {
@@ -91,6 +119,13 @@ func (f *FluxModule) Route(defs ...RouteDefinition) *FluxModule {
 }
 
 func (m *FluxModule) HttpRoute(f *FluxGo, http *Http, apm *Apm, group string, method string, path string, config RouteIncome, handler HttpHandler) error {
+	tagName := m.Name
+	if m.swaggerTag != nil {
+		http.registerModuleTag(m.Name, *m.swaggerTag)
+		if m.swaggerTag.Title != "" {
+			tagName = m.swaggerTag.Title
+		}
+	}
 	fun := func(c *fiber.Ctx) error {
 		ctx := c.UserContext()
 
@@ -147,7 +182,7 @@ func (m *FluxModule) HttpRoute(f *FluxGo, http *Http, apm *Apm, group string, me
 	http.addRouteDoc(routeDoc{
 		method:     method,
 		path:       fmt.Sprintf("%s%s", group, path),
-		tags:       []string{m.Name},
+		tags:       []string{tagName},
 		doc:        config.Doc,
 		entity:     config.Entity,
 		fromBody:   config.FromBody,

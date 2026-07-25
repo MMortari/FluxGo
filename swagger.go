@@ -285,6 +285,21 @@ func (h *Http) buildOpenAPISpec(title, version, description, prefix string) map[
 	if len(components) > 0 {
 		spec["components"] = map[string]any{"schemas": components}
 	}
+	if len(h.moduleTags) > 0 {
+		tags := make([]any, 0, len(h.moduleTags))
+		for moduleName, tagCfg := range h.moduleTags {
+			tagName := moduleName
+			if tagCfg.Title != "" {
+				tagName = tagCfg.Title
+			}
+			entry := map[string]any{"name": tagName}
+			if tagCfg.Description != "" {
+				entry["description"] = tagCfg.Description
+			}
+			tags = append(tags, entry)
+		}
+		spec["tags"] = tags
+	}
 	return spec
 }
 

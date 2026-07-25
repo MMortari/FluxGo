@@ -142,6 +142,14 @@ type Http struct {
 	validator   *Validator
 	permissions *Permissions
 	docs        []routeDoc
+	moduleTags  map[string]SwaggerModuleTag
+}
+
+func (h *Http) registerModuleTag(name string, tag SwaggerModuleTag) {
+	if h.moduleTags == nil {
+		h.moduleTags = map[string]SwaggerModuleTag{}
+	}
+	h.moduleTags[name] = tag
 }
 
 func (h *Http) GetPermissions(ctx context.Context) []PermissionRule {
