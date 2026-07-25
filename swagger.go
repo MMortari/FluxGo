@@ -233,11 +233,29 @@ func (h *Http) buildOpenAPISpec(title, version, description, prefix string) map[
 
 			// json: fields not matched to path params → requestBody.
 			if hasBodyFields {
+				schema := schemaRef(doc.entity, components)
+				// Remove non-body fields (params/query/header) from the generated schema.
+				// Fields without a json tag appear in the schema under their Go field name.
+				if schemaMap, ok := schema.(map[string]any); ok {
+					if props, ok := schemaMap["properties"].(map[string]any); ok {
+						for i := range entityType.NumField() {
+							field := entityType.Field(i)
+							if tagValue(field, "params") == "" && tagValue(field, "query") == "" && tagValue(field, "header") == "" {
+								continue
+							}
+							key := tagValue(field, "json")
+							if key == "" {
+								key = field.Name
+							}
+							delete(props, key)
+						}
+					}
+				}
 				operation["requestBody"] = map[string]any{
 					"required": true,
 					"content": map[string]any{
 						"application/json": map[string]any{
-							"schema": schemaRef(doc.entity, components),
+							"schema": schema,
 						},
 					},
 				}
