@@ -82,21 +82,25 @@ func (f *FluxGo) AddHttp(opt HttpOptions, configApp HttpConfig) *FluxGo {
 
 		if opt.Swagger != nil {
 			swOpts := *opt.Swagger
-			if swOpts.Path == "" {
-				swOpts.Path = "/swagger"
-			}
 			title := swOpts.Title
 			if title == "" {
 				title = f.Name
 			}
-			specPath := swOpts.Path + "/openapi.json"
-			http.app.Get(swOpts.Path, func(c *fiber.Ctx) error {
-				c.Set("Content-Type", "text/html; charset=utf-8")
-				return c.SendString(swaggerUIHTML(specPath))
-			})
-			http.app.Get(specPath, func(c *fiber.Ctx) error {
-				return c.JSON(http.buildOpenAPISpec(title, f.Version, swOpts.Description))
-			})
+			for prefix := range http.routers {
+				p := prefix
+				path := swOpts.Path
+				if path == "" {
+					path = "/swagger"
+				}
+				specPath := p + path + "/openapi.json"
+				http.app.Get(p+path, func(c *fiber.Ctx) error {
+					c.Set("Content-Type", "text/html; charset=utf-8")
+					return c.SendString(swaggerUIHTML(specPath))
+				})
+				http.app.Get(specPath, func(c *fiber.Ctx) error {
+					return c.JSON(http.buildOpenAPISpec(title, f.Version, swOpts.Description, p))
+				})
+			}
 		}
 
 		return http

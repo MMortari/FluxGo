@@ -12,14 +12,20 @@ func TestSwagger(t *testing.T) {
 	fx, app := module.Module().GetTestApp(t)
 	defer fx.RequireStart().RequireStop()
 
-	t.Run("should serve swagger UI", func(t *testing.T) {
-		status, body := fluxgo.RunTestRequestRaw(app, "GET", "/swagger", nil, nil)
+	t.Run("should serve swagger UI for /public group", func(t *testing.T) {
+		status, body := fluxgo.RunTestRequestRaw(app, "GET", "/public/swagger", nil, nil)
 		assert.Equal(t, 200, status)
 		assert.Contains(t, string(body), "swagger-ui")
 	})
 
-	t.Run("should serve openapi spec", func(t *testing.T) {
-		status, spec := fluxgo.RunTestRequest(app, "GET", "/swagger/openapi.json", nil, nil)
+	t.Run("should serve swagger UI for /internal group", func(t *testing.T) {
+		status, body := fluxgo.RunTestRequestRaw(app, "GET", "/internal/swagger", nil, nil)
+		assert.Equal(t, 200, status)
+		assert.Contains(t, string(body), "swagger-ui")
+	})
+
+	t.Run("should serve openapi spec for /public group", func(t *testing.T) {
+		status, spec := fluxgo.RunTestRequest(app, "GET", "/public/swagger/openapi.json", nil, nil)
 		assert.Equal(t, 200, status)
 
 		assert.Equal(t, "3.0.3", spec["openapi"])
@@ -30,15 +36,13 @@ func TestSwagger(t *testing.T) {
 		paths := fluxgo.ConvertToMap(spec["paths"])
 		assert.Contains(t, paths, "/public/user")
 		assert.Contains(t, paths, "/public/user/{id_user}")
-		assert.Contains(t, paths, "/internal/refresh")
+		// /internal/refresh não deve aparecer no spec do /public
+		assert.NotContains(t, paths, "/internal/refresh")
 
 		// GET /public/user tem tag "user"
 		get := fluxgo.ConvertToMap(fluxgo.ConvertToMap(paths["/public/user"])["get"])
 		tags := get["tags"].([]interface{})
 		assert.Equal(t, "user", tags[0])
-
-		// POST /internal/refresh existe
-		assert.NotNil(t, fluxgo.ConvertToMap(paths["/internal/refresh"])["post"])
 
 		// /public/user/{id_user} tem path param id_user
 		getParam := fluxgo.ConvertToMap(fluxgo.ConvertToMap(paths["/public/user/{id_user}"])["get"])
@@ -47,6 +51,16 @@ func TestSwagger(t *testing.T) {
 		firstParam := fluxgo.ConvertToMap(params[0])
 		assert.Equal(t, "id_user", firstParam["name"])
 		assert.Equal(t, "path", firstParam["in"])
+	})
+
+	t.Run("should serve openapi spec for /internal group", func(t *testing.T) {
+		status, spec := fluxgo.RunTestRequest(app, "GET", "/internal/swagger/openapi.json", nil, nil)
+		assert.Equal(t, 200, status)
+
+		paths := fluxgo.ConvertToMap(spec["paths"])
+		assert.Contains(t, paths, "/internal/refresh")
+		// /public routes não devem aparecer no spec do /internal
+		assert.NotContains(t, paths, "/public/user")
 	})
 }
 

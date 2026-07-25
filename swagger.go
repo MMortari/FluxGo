@@ -117,13 +117,17 @@ func responseObject(description string, d *RouteDoc, bodyFn func(*RouteDoc) any,
 }
 
 // buildOpenAPISpec generates an OpenAPI 3.0 spec from all collected route docs.
-// Spec generation is lazy: called on first request to /swagger/openapi.json,
+// Spec generation is lazy: called on first request to /{group}/swagger/openapi.json,
 // ensuring all routes are already registered.
-func (h *Http) buildOpenAPISpec(title, version, description string) map[string]any {
+// prefix filters routes to only those under that group (e.g. "/public").
+func (h *Http) buildOpenAPISpec(title, version, description, prefix string) map[string]any {
 	paths := map[string]any{}
 	components := map[string]any{} // shared schemas accumulator
 
 	for _, doc := range h.docs {
+		if prefix != "" && !strings.HasPrefix(doc.path, prefix) {
+			continue
+		}
 		oaPath := fiberPathToOpenAPI(doc.path)
 
 		if _, ok := paths[oaPath]; !ok {
