@@ -178,8 +178,7 @@ func (h *Http) buildOpenAPISpec(title, version, description, prefix string) map[
 				t = t.Elem()
 			}
 			if t.Kind() == reflect.Struct {
-				for i := range t.NumField() {
-					f := t.Field(i)
+				for _, f := range flattenFields(t) {
 					for _, key := range []string{"json", "query", "header", "params"} {
 						if name := tagValue(f, key); name != "" {
 							entityFields[name] = f
@@ -213,8 +212,7 @@ func (h *Http) buildOpenAPISpec(title, version, description, prefix string) map[
 			// Walk entity fields: query → in:query | header → in:header | json → body (if not a path param).
 			var hasBodyFields bool
 			if entityType.Kind() == reflect.Struct {
-				for i := range entityType.NumField() {
-					field := entityType.Field(i)
+				for _, field := range flattenFields(entityType) {
 					required := strings.Contains(field.Tag.Get("validate"), "required")
 
 					if name := tagValue(field, "query"); name != "" {
@@ -238,8 +236,7 @@ func (h *Http) buildOpenAPISpec(title, version, description, prefix string) map[
 				// Fields without a json tag appear in the schema under their Go field name.
 				if schemaMap, ok := schema.(map[string]any); ok {
 					if props, ok := schemaMap["properties"].(map[string]any); ok {
-						for i := range entityType.NumField() {
-							field := entityType.Field(i)
+						for _, field := range flattenFields(entityType) {
 							if tagValue(field, "params") == "" && tagValue(field, "query") == "" && tagValue(field, "header") == "" {
 								continue
 							}
@@ -356,6 +353,26 @@ func extractJsonSchemaMeta(f reflect.StructField) map[string]any {
 		}
 	}
 	return props
+}
+
+// flattenFields returns all struct fields, recursing into anonymous (embedded) structs.
+func flattenFields(t reflect.Type) []reflect.StructField {
+	var out []reflect.StructField
+	for i := range t.NumField() {
+		f := t.Field(i)
+		if f.Anonymous {
+			ft := f.Type
+			if ft.Kind() == reflect.Ptr {
+				ft = ft.Elem()
+			}
+			if ft.Kind() == reflect.Struct {
+				out = append(out, flattenFields(ft)...)
+				continue
+			}
+		}
+		out = append(out, f)
+	}
+	return out
 }
 
 // tagValue returns the first segment of the given struct tag (before any comma),
