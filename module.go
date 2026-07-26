@@ -16,10 +16,6 @@ type ModuleOption interface {
 	applyModuleOption(m *FluxModule)
 }
 
-type moduleOptionFunc func(m *FluxModule)
-
-func (f moduleOptionFunc) applyModuleOption(m *FluxModule) { f(m) }
-
 // SwaggerModuleTag holds OpenAPI top-level tag metadata for a module.
 type SwaggerModuleTag struct {
 	Title       string
