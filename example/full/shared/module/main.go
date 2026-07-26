@@ -50,8 +50,15 @@ func Module() *fluxgo.FluxGo {
 		Permissions:     getPermissions(),
 		Swagger:         &fluxgo.SwaggerOptions{Description: "API de exemplo do FluxGo"},
 	}, func(data fluxgo.HttpConfigData) {
-		data.CreateRouter("/public", middlewareExample())
-		data.CreateRouter("/internal", middlewareExample())
+		data.CreateRouter("/public", fluxgo.WithMiddleware(middlewareExample()))
+		data.CreateRouter("/internal",
+			fluxgo.WithMiddleware(middlewareExample()),
+			fluxgo.WithSwagger(fluxgo.SwaggerRouterConfig{
+				Headers: []fluxgo.SwaggerRouterHeader{
+					{Name: "Authorization", Description: "Bearer JWT token", Required: true},
+				},
+			}),
+		)
 	})
 	flux.AddTools()
 	flux.AddGrpc(fluxgo.GrpcOptions{Port: 50051, Reflection: true})

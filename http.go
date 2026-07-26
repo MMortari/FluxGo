@@ -135,14 +135,48 @@ type Validator struct {
 	*validator.Validate
 }
 
+// SwaggerRouterHeader defines a header parameter shown in Swagger for all routes in a router group.
+type SwaggerRouterHeader struct {
+	Name        string
+	Description string
+	Required    bool
+}
+
+// SwaggerRouterConfig holds Swagger metadata for a specific router group.
+type SwaggerRouterConfig struct {
+	Headers []SwaggerRouterHeader
+}
+
+// routerBuildCtx accumulates fiber handlers while RouterOptions are applied.
+type routerBuildCtx struct {
+	handlers []fiber.Handler
+}
+
+// RouterOption configures a router group created by CreateRouter.
+type RouterOption interface {
+	applyRouterOption(h *Http, prefix string, ctx *routerBuildCtx)
+}
+
+// WithMiddleware adds fiber middleware handlers to the router group.
+func WithMiddleware(handlers ...fiber.Handler) RouterOption {
+	return middlewareOpt{handlers: handlers}
+}
+
+type middlewareOpt struct{ handlers []fiber.Handler }
+
+func (o middlewareOpt) applyRouterOption(_ *Http, _ string, ctx *routerBuildCtx) {
+	ctx.handlers = append(ctx.handlers, o.handlers...)
+}
+
 type Http struct {
-	port        int
-	app         *fiber.App
-	routers     map[string]*fiber.Router
-	validator   *Validator
-	permissions *Permissions
-	docs        []routeDoc
-	moduleTags  map[string]SwaggerModuleTag
+	port          int
+	app           *fiber.App
+	routers       map[string]*fiber.Router
+	validator     *Validator
+	permissions   *Permissions
+	docs          []routeDoc
+	moduleTags    map[string]SwaggerModuleTag
+	routerSwagger map[string]SwaggerRouterConfig
 }
 
 func (h *Http) registerModuleTag(name string, tag SwaggerModuleTag) {
@@ -150,6 +184,13 @@ func (h *Http) registerModuleTag(name string, tag SwaggerModuleTag) {
 		h.moduleTags = map[string]SwaggerModuleTag{}
 	}
 	h.moduleTags[name] = tag
+}
+
+func (h *Http) registerRouterSwagger(prefix string, config SwaggerRouterConfig) {
+	if h.routerSwagger == nil {
+		h.routerSwagger = map[string]SwaggerRouterConfig{}
+	}
+	h.routerSwagger[prefix] = config
 }
 
 func (h *Http) GetPermissions(ctx context.Context) []PermissionRule {
@@ -265,8 +306,12 @@ func (h *Http) stop(ctx context.Context) error {
 func (h *Http) GetApp() *fiber.App {
 	return h.app
 }
-func (h *Http) CreateRouter(prefix string, handlers ...fiber.Handler) *Http {
-	route := h.GetApp().Group(prefix, handlers...)
+func (h *Http) CreateRouter(prefix string, opts ...RouterOption) *Http {
+	ctx := &routerBuildCtx{}
+	for _, opt := range opts {
+		opt.applyRouterOption(h, prefix, ctx)
+	}
+	route := h.GetApp().Group(prefix, ctx.handlers...)
 	h.routers[prefix] = &route
 
 	return h

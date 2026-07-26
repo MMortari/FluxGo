@@ -191,6 +191,26 @@ func (h *Http) buildOpenAPISpec(title, version, description, prefix string) map[
 		// Path parameters — from URL pattern, enriched with entity field metadata if matched.
 		pathParamSet := map[string]bool{}
 		params := []any{}
+
+		// Inject router-level headers for all routes under the matched prefix.
+		for prefix, routerCfg := range h.routerSwagger {
+			if !strings.HasPrefix(doc.path, prefix) {
+				continue
+			}
+			for _, hdr := range routerCfg.Headers {
+				param := map[string]any{
+					"name":     hdr.Name,
+					"in":       "header",
+					"required": hdr.Required,
+					"schema":   map[string]any{"type": "string"},
+				}
+				if hdr.Description != "" {
+					param["description"] = hdr.Description
+				}
+				params = append(params, param)
+			}
+		}
+
 		pathsParams := extractPathParams(doc.path)
 		for _, p := range pathsParams {
 			pathParamSet[p] = true

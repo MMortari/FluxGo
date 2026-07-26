@@ -11,7 +11,7 @@ import (
 	"go.uber.org/fx"
 )
 
-// ModuleOption configures a FluxModule. Use WithSwagger to add Swagger metadata.
+// ModuleOption configures a FluxModule.
 type ModuleOption interface {
 	applyModuleOption(m *FluxModule)
 }
@@ -26,12 +26,34 @@ type SwaggerModuleTag struct {
 	Description string
 }
 
-// WithSwagger configures Swagger/OpenAPI tag metadata for the module.
-// The tag name is the module name; Description appears in Swagger UI.
-func WithSwagger(tag SwaggerModuleTag) ModuleOption {
-	return moduleOptionFunc(func(m *FluxModule) {
-		m.swaggerTag = &tag
-	})
+// swaggerOpt implements both ModuleOption and RouterOption so WithSwagger works in both contexts.
+type swaggerOpt struct {
+	moduleTag *SwaggerModuleTag
+	routerCfg *SwaggerRouterConfig
+}
+
+func (o swaggerOpt) applyModuleOption(m *FluxModule) {
+	if o.moduleTag != nil {
+		m.swaggerTag = o.moduleTag
+	}
+}
+
+func (o swaggerOpt) applyRouterOption(h *Http, prefix string, _ *routerBuildCtx) {
+	if o.routerCfg != nil {
+		h.registerRouterSwagger(prefix, *o.routerCfg)
+	}
+}
+
+// WithSwagger configures Swagger metadata for a Module (pass SwaggerModuleTag)
+// or a router group (pass SwaggerRouterConfig).
+func WithSwagger[T SwaggerModuleTag | SwaggerRouterConfig](cfg T) swaggerOpt {
+	switch v := any(cfg).(type) {
+	case SwaggerModuleTag:
+		return swaggerOpt{moduleTag: &v}
+	case SwaggerRouterConfig:
+		return swaggerOpt{routerCfg: &v}
+	}
+	return swaggerOpt{}
 }
 
 type FluxModule struct {
