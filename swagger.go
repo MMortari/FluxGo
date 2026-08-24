@@ -174,7 +174,7 @@ func (h *Http) buildOpenAPISpec(title, version, description, prefix string) map[
 		entityFields := map[string]reflect.StructField{}
 		if doc.entity != nil {
 			t := reflect.TypeOf(doc.entity)
-			if t.Kind() == reflect.Ptr {
+			if t.Kind() == reflect.Pointer {
 				t = t.Elem()
 			}
 			if t.Kind() == reflect.Struct {
@@ -225,7 +225,7 @@ func (h *Http) buildOpenAPISpec(title, version, description, prefix string) map[
 		}
 		if doc.entity != nil {
 			entityType := reflect.TypeOf(doc.entity)
-			if entityType.Kind() == reflect.Ptr {
+			if entityType.Kind() == reflect.Pointer {
 				entityType = entityType.Elem()
 			}
 
@@ -382,7 +382,7 @@ func flattenFields(t reflect.Type) []reflect.StructField {
 		f := t.Field(i)
 		if f.Anonymous {
 			ft := f.Type
-			if ft.Kind() == reflect.Ptr {
+			if ft.Kind() == reflect.Pointer {
 				ft = ft.Elem()
 			}
 			if ft.Kind() == reflect.Struct {
