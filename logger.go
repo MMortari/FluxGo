@@ -35,26 +35,36 @@ type LoggerOptions struct {
 
 func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
 	f.AddDependency(func() *Logger {
-		log := Logger{
-			Logger: otelslog.NewLogger(f.GetCleanName()).With(
-				slog.String("environment", f.Env.Env),
-				slog.String("service.name", f.GetCleanName()),
-				slog.String("service.version", f.Version),
-			),
-			opt: opt,
+		if opt.Type == "console" {
+			log := Logger{
+				Logger: slog.New(slog.NewTextHandler(
+					os.Stdout,
+					&slog.HandlerOptions{Level: resolveLogLevel(opt.Level)},
+				)),
+				opt: opt,
+			}
+
+			return &log
+		} else {
+			log := Logger{
+				Logger: otelslog.NewLogger(f.GetCleanName()).With(
+					slog.String("environment", f.Env.Env),
+					slog.String("service.name", f.GetCleanName()),
+					slog.String("service.version", f.Version),
+				),
+				opt: opt,
+			}
+			return &log
 		}
-		return &log
 	})
 	f.AddInvoke(func(lc fx.Lifecycle, log *Logger, o *Otel) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				if f.Env.IsTest() {
-					opt.Type = "console"
-				}
-
 				var processor sdklog.Processor
 
 				switch opt.Type {
+				case "console":
+					return nil
 				case "otel":
 					if o.grpcConnection != nil {
 						logExporter, err := otlploggrpc.New(context.Background(), otlploggrpc.WithGRPCConn(o.grpcConnection))
@@ -139,4 +149,17 @@ func (li *LoggerInstance) Error(msg string, attrs ...slog.Attr) {
 }
 func (li *LoggerInstance) Errorf(format string, a ...any) {
 	li.Log(li.ctx, slog.LevelError, fmt.Errorf(format, a...).Error())
+}
+
+func resolveLogLevel(level string) slog.Level {
+	switch level {
+	case "debug":
+		return slog.LevelDebug
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }
