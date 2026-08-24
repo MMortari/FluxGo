@@ -21,33 +21,41 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Docker Examples
+        working-directory: example/full
+        id: docker
+        background: true
+        run: |
+          docker compose up -d
+          sleep 10
+
       - name: Setup Golang with cache
         uses: magnetikonline/action-golang-cache@v5
         id: golang-with-cache
         with:
           go-version-file: go.mod
 
-      - name: Running scopeguard
-        run: |
-          go install fillmore-labs.com/scopeguard@latest
-          scopeguard ./...
+      - name: Download dependencies
+        run: go mod download
 
-      - name: Running lint
-        uses: golangci/golangci-lint-action@v8
-        timeout-minutes: 5
-        with:
-          version: v2.4
-          skip-cache: false
+      - parallel:
+          - name: Running scopeguard
+            run: |
+              go install fillmore-labs.com/scopeguard@latest
+              scopeguard ./...
 
-      - name: Test
-        run: |
-          ENV=test go test . -cover
+          - name: Running lint
+            uses: golangci/golangci-lint-action@v8
+            timeout-minutes: 5
+            with:
+              skip-cache: false
 
-      - name: Docker Examples
-        working-directory: example/full
-        run: |
-          docker compose up -d
-          sleep 10
+          - name: Test
+            run: |
+              ENV=test go test . -cover
+
+      - name: Wait docker compose
+        wait: docker
 
       - name: Test Examples
         working-directory: example/full
