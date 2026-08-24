@@ -104,8 +104,10 @@ func (f *FluxGo) ConfigLogger(opt LoggerOptions) *FluxGo {
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				if err := log.provider.Shutdown(ctx); err != nil {
-					return err
+				if log.provider != nil {
+					if err := log.provider.Shutdown(ctx); err != nil {
+						return err
+					}
 				}
 				if log.file != nil {
 					if err := log.file.Close(); err != nil {
