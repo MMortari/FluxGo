@@ -32,21 +32,27 @@ func (f *FluxGo) AddApm() *FluxGo {
 	f.AddInvoke(func(lc fx.Lifecycle, apm *Apm, o *Otel) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				var traceExporter sdktrace.SpanExporter
-				var err error
-				if o.grpcConnection != nil {
-					traceExporter, err = otlptracegrpc.New(context.Background(), otlptracegrpc.WithGRPCConn(o.grpcConnection))
-				} else {
-					traceExporter, err = stdouttrace.New()
-				}
-				if err != nil {
-					return err
+				tpOpts := []sdktrace.TracerProviderOption{sdktrace.WithResource(o.res)}
+
+				switch o.opt.Exporter {
+				case "grpc":
+					if o.grpcConnection != nil {
+						traceExporter, err := otlptracegrpc.New(context.Background(), otlptracegrpc.WithGRPCConn(o.grpcConnection))
+						if err != nil {
+							return err
+						}
+						tpOpts = append(tpOpts, sdktrace.WithBatcher(traceExporter))
+					}
+				case "console":
+					traceExporter, err := stdouttrace.New()
+					if err != nil {
+						return err
+					}
+					tpOpts = append(tpOpts, sdktrace.WithBatcher(traceExporter))
+				case "none":
 				}
 
-				traceProvider := sdktrace.NewTracerProvider(
-					sdktrace.WithBatcher(traceExporter),
-					sdktrace.WithResource(o.res),
-				)
+				traceProvider := sdktrace.NewTracerProvider(tpOpts...)
 				otel.SetTracerProvider(traceProvider)
 				otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
 					propagation.TraceContext{},

@@ -29,14 +29,15 @@ func (f *FluxGo) addOtel(opt OtelOptions) *FluxGo {
 
 	otel := Otel{res: res, opt: opt}
 
-	if opt.Exporter == "grpc" {
-		conn, err := grpc.NewClient(opt.CollectorURL,
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
+	switch opt.Exporter {
+	case "grpc":
+		conn, err := grpc.NewClient(opt.CollectorURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			panic(err)
 		}
 		otel.grpcConnection = conn
+	case "none":
+		// skip exporter setup, used in tests
 	}
 
 	f.otel = &otel

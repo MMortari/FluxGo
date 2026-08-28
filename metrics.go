@@ -39,22 +39,27 @@ func (f *FluxGo) AddMetrics() *FluxGo {
 			mutex:             sync.RWMutex{},
 		}
 
-		var exporter sdkmetric.Exporter
-		var err error
+		mpOpts := []sdkmetric.Option{sdkmetric.WithResource(o.res)}
 
-		if o.grpcConnection != nil {
-			exporter, err = otlpmetricgrpc.New(context.Background(), otlpmetricgrpc.WithGRPCConn(o.grpcConnection))
-		} else {
-			exporter, err = stdoutmetric.New()
-		}
-		if err != nil {
-			panic(err)
+		switch o.opt.Exporter {
+		case "grpc":
+			if o.grpcConnection != nil {
+				exporter, err := otlpmetricgrpc.New(context.Background(), otlpmetricgrpc.WithGRPCConn(o.grpcConnection))
+				if err != nil {
+					panic(err)
+				}
+				mpOpts = append(mpOpts, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter)))
+			}
+		case "console":
+			exporter, err := stdoutmetric.New()
+			if err != nil {
+				panic(err)
+			}
+			mpOpts = append(mpOpts, sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter)))
+		case "none":
 		}
 
-		meterProvider := sdkmetric.NewMeterProvider(
-			sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter)),
-			sdkmetric.WithResource(o.res),
-		)
+		meterProvider := sdkmetric.NewMeterProvider(mpOpts...)
 		otel.SetMeterProvider(meterProvider)
 
 		metrics.Provider = meterProvider
