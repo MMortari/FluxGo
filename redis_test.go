@@ -38,7 +38,7 @@ func newTestRedis(t *testing.T) (*Redis, *miniredis.Miniredis) {
 
 	t.Cleanup(func() {
 		cancel()
-		r.client.Close()
+		_ = r.client.Close()
 	})
 
 	return r, srv

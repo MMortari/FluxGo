@@ -194,7 +194,7 @@ func (r *Redis) Subscribe(ctx context.Context, topic string) (<-chan []byte, fun
 
 	if _, err := pubsub.Receive(handshakeCtx); err != nil {
 		span.SetError(err)
-		pubsub.Close()
+		_ = pubsub.Close()
 		cancel()
 		r.wg.Done()
 
@@ -209,11 +209,9 @@ func (r *Redis) Subscribe(ctx context.Context, topic string) (<-chan []byte, fun
 		defer cancel()
 		defer close(done)
 		defer close(messages)
-		defer pubsub.Close()
+		defer func() { _ = pubsub.Close() }()
 
-		ch := pubsub.Channel()
-
-		for {
+		for ch := pubsub.Channel(); ; {
 			select {
 			case <-subCtx.Done():
 				return
