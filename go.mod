@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/IBM/sarama v1.46.3
+	github.com/alicebob/miniredis/v2 v2.39.0
 	github.com/ansrivas/fiberprometheus/v2 v2.17.0
 	github.com/caarlos0/env/v11 v11.3.1
 	github.com/go-co-op/gocron/v2 v2.18.0
@@ -96,6 +97,7 @@ require (
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.69.0 // indirect
 	github.com/wk8/go-ordered-map/v2 v2.1.8 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/contrib v1.20.0 // indirect
