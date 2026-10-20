@@ -136,6 +136,9 @@ func (f *FluxModule) Route(defs ...RouteDefinition) *FluxModule {
 	return f
 }
 
+const PermissionActionContextKey = "permission.action"
+const PermissionSubjectContextKey = "permission.subject"
+
 func (m *FluxModule) HttpRoute(f *FluxGo, http *Http, apm *Apm, group string, method string, path string, config RouteIncome, handler HttpHandler) error {
 	tagName := m.Name
 	if m.swaggerTag != nil {
@@ -148,6 +151,9 @@ func (m *FluxModule) HttpRoute(f *FluxGo, http *Http, apm *Apm, group string, me
 		ctx := c.UserContext()
 
 		if config.Permission != nil {
+			c.Locals(PermissionActionContextKey, config.Permission.Action)
+			c.Locals(PermissionSubjectContextKey, config.Permission.Subject)
+
 			role, _ := ctx.Value(RoleContextKey).(string)
 			if role == "" {
 				return c.Status(fiber.StatusUnauthorized).JSON(&GlobalError{
