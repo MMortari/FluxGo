@@ -22,6 +22,12 @@ type FluxGo struct {
 	replaces     []fx.Option
 	supplies     []fx.Option
 	modules      []*FluxModule
+
+	httpSpecs      []httpSpec
+	httpRegistered bool
+
+	grpcSpecs      []GrpcOptions
+	grpcRegistered bool
 }
 type FluxGoConfig struct {
 	Name         string
@@ -121,19 +127,34 @@ func (f *FluxGo) Run() {
 	fx.New(f.GetFxConfig()...).Run()
 }
 
+// GetTestApp builds the test app and returns the default HTTP server.
 func (f *FluxGo) GetTestApp(t *testing.T) (*fxtest.App, *Http) {
+	return f.GetTestAppNamed(t, "")
+}
+
+// GetTestAppNamed builds the test app and returns the HTTP server registered under name.
+// An empty name resolves to the default server.
+func (f *FluxGo) GetTestAppNamed(t *testing.T, name string) (*fxtest.App, *Http) {
+	fxApp, registry := GetTestRegistry[HttpRegistry](f, t)
+
+	return fxApp, registry.Get(name)
+}
+
+// GetTestRegistry builds the test app and returns the registry of type T
+// (HttpRegistry or GrpcRegistry), so tests can reach every registered server.
+func GetTestRegistry[T HttpRegistry | GrpcRegistry](f *FluxGo, t *testing.T) (*fxtest.App, *T) {
 	f.Debugger = false
 	f.FullDebugger = false
 
-	var http *Http
+	var registry *T
 
-	opts := append(f.GetFxConfig(), fx.Invoke(func(h *Http) {
-		http = h
+	opts := append(f.GetFxConfig(), fx.Invoke(func(r *T) {
+		registry = r
 	}), fx.NopLogger)
 
 	fxApp := fxtest.New(t, opts...)
 
-	return fxApp, http
+	return fxApp, registry
 }
 
 func (f *FluxGo) Log(key, message string) {

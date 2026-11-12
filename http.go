@@ -31,95 +31,104 @@ type HttpParams struct {
 	Prometheus *Prometheus `optional:"true"`
 }
 
+// httpSpec holds one AddHttp call until the container is built.
+type httpSpec struct {
+	opt       HttpOptions
+	configApp HttpConfig
+}
+
+// DefaultServerName is the name given to a server registered without an explicit Name.
+const DefaultServerName = "default"
+
+// HttpRegistry holds every HTTP server registered through AddHttp, keyed by name.
+type HttpRegistry struct {
+	servers map[string]*Http
+	order   []*Http
+	def     *Http
+}
+
+// Get returns the server registered under name.
+// An empty name resolves to the default server (the first one registered).
+func (r *HttpRegistry) Get(name string) *Http {
+	if name == "" {
+		return r.def
+	}
+
+	return r.servers[name]
+}
+
+// Default returns the first server registered through AddHttp.
+func (r *HttpRegistry) Default() *Http {
+	return r.def
+}
+
+// All returns every registered server, in registration order.
+func (r *HttpRegistry) All() []*Http {
+	return r.order
+}
+
+// AddHttp registers an HTTP server with lifecycle management.
+// It can be called more than once to expose several servers (each on its own port);
+// name them through HttpOptions.Name and select them per route via RouteIncome.Server.
+// The first server registered is the default one and is the one injected as *Http.
 func (f *FluxGo) AddHttp(opt HttpOptions, configApp HttpConfig) *FluxGo {
-	f.AddDependency(func(params HttpParams) *Http {
-		opt.FiberConfig.DisableStartupMessage = true
-		app := fiber.New(opt.FiberConfig)
+	f.httpSpecs = append(f.httpSpecs, httpSpec{opt: opt, configApp: configApp})
 
-		if params.Apm != nil {
-			app.Use(params.Apm.SetFiberMiddleware())
-		}
-		app.Use(helmet.New())
-		if opt.Cors != nil {
-			app.Use(cors.New(*opt.Cors))
-		} else {
-			app.Use(cors.New())
-		}
+	if f.httpRegistered {
+		return f
+	}
+	f.httpRegistered = true
 
-		if opt.ConfigApp != nil {
-			opt.ConfigApp(app)
-		}
-		if opt.LogRequest {
-			app.Use(logger.New(logger.Config{
-				Format: "${time} ${status} - ${method} ${path} ${latency}\n",
-			}))
-		}
-		if opt.AddHealthRoutes {
-			app.Get("/live", func(c *fiber.Ctx) error {
-				return c.SendStatus(fiber.StatusOK)
-			})
-			app.Get("/health", func(c *fiber.Ctx) error {
-				return c.SendStatus(fiber.StatusOK)
-			})
-			app.Get("/readyz", func(c *fiber.Ctx) error {
-				return c.SendStatus(fiber.StatusOK)
-			})
-		}
+	f.AddDependency(func(params HttpParams) (*HttpRegistry, error) {
+		registry := &HttpRegistry{servers: make(map[string]*Http)}
+		ports := make(map[int]string)
 
-		http := &Http{app: app, port: opt.Port, routers: make(map[string]*fiber.Router), permissions: opt.Permissions}
-
-		if params.Prometheus != nil {
-			http.app.Use(params.Prometheus.Middleware(app, "/metrics"))
-		}
-
-		http.GetValidator()
-
-		configApp(HttpConfigData{
-			Http:       http,
-			Apm:        params.Apm,
-			Prometheus: params.Prometheus,
-		})
-
-		if opt.Swagger != nil {
-			swOpts := *opt.Swagger
-			title := swOpts.Title
-			if title == "" {
-				title = f.Name
+		for _, spec := range f.httpSpecs {
+			name := spec.opt.Name
+			if name == "" {
+				name = DefaultServerName
 			}
-			for prefix := range http.routers {
-				p := prefix
-				path := swOpts.Path
-				if path == "" {
-					path = "/swagger"
-				}
-				specPath := p + path + "/openapi.json"
-				http.app.Get(p+path, func(c *fiber.Ctx) error {
-					c.Set("Content-Type", "text/html; charset=utf-8")
-					return c.SendString(swaggerUIHTML(specPath))
-				})
-				http.app.Get(specPath, func(c *fiber.Ctx) error {
-					return c.JSON(http.buildOpenAPISpec(title, f.Version, swOpts.Description, p))
-				})
+
+			if _, exists := registry.servers[name]; exists {
+				return nil, fmt.Errorf("http server %q already registered", name)
+			}
+			if other, exists := ports[spec.opt.Port]; exists {
+				return nil, fmt.Errorf("http port %d already used by server %q", spec.opt.Port, other)
+			}
+			ports[spec.opt.Port] = name
+
+			http := f.buildHttp(name, spec.opt, spec.configApp, params)
+
+			registry.servers[name] = http
+			registry.order = append(registry.order, http)
+			if registry.def == nil {
+				registry.def = http
 			}
 		}
 
-		return http
+		return registry, nil
 	})
-	f.AddInvoke(func(lc fx.Lifecycle, http *Http) error {
+	f.AddDependency(func(registry *HttpRegistry) *Http { return registry.def })
+
+	f.AddInvoke(func(lc fx.Lifecycle, registry *HttpRegistry) error {
 		lc.Append(fx.Hook{
 			OnStart: func(ctx context.Context) error {
-				if err := http.start(ctx); err != nil {
-					return err
+				for _, http := range registry.All() {
+					if err := http.start(ctx); err != nil {
+						return err
+					}
+					f.Log("HTTP", fmt.Sprintf("[%s] Running on port %d", http.name, http.port))
 				}
-				f.Log("HTTP", fmt.Sprintf("Running on port %d", http.port))
 
 				return nil
 			},
 			OnStop: func(ctx context.Context) error {
-				if err := http.stop(ctx); err != nil {
-					return err
+				for _, http := range registry.All() {
+					if err := http.stop(ctx); err != nil {
+						return err
+					}
+					f.Log("HTTP", fmt.Sprintf("[%s] Stopped", http.name))
 				}
-				f.Log("HTTP", "Stopped")
 
 				return nil
 			},
@@ -129,6 +138,80 @@ func (f *FluxGo) AddHttp(opt HttpOptions, configApp HttpConfig) *FluxGo {
 	})
 
 	return f
+}
+
+func (f *FluxGo) buildHttp(name string, opt HttpOptions, configApp HttpConfig, params HttpParams) *Http {
+	opt.FiberConfig.DisableStartupMessage = true
+	app := fiber.New(opt.FiberConfig)
+
+	if params.Apm != nil {
+		app.Use(params.Apm.SetFiberMiddleware())
+	}
+	app.Use(helmet.New())
+	if opt.Cors != nil {
+		app.Use(cors.New(*opt.Cors))
+	} else {
+		app.Use(cors.New())
+	}
+
+	if opt.ConfigApp != nil {
+		opt.ConfigApp(app)
+	}
+	if opt.LogRequest {
+		app.Use(logger.New(logger.Config{
+			Format: "${time} ${status} - ${method} ${path} ${latency}\n",
+		}))
+	}
+	if opt.AddHealthRoutes {
+		app.Get("/live", func(c *fiber.Ctx) error {
+			return c.SendStatus(fiber.StatusOK)
+		})
+		app.Get("/health", func(c *fiber.Ctx) error {
+			return c.SendStatus(fiber.StatusOK)
+		})
+		app.Get("/readyz", func(c *fiber.Ctx) error {
+			return c.SendStatus(fiber.StatusOK)
+		})
+	}
+
+	http := &Http{name: name, app: app, port: opt.Port, routers: make(map[string]*fiber.Router), permissions: opt.Permissions}
+
+	if params.Prometheus != nil {
+		http.app.Use(params.Prometheus.Middleware(app, "/metrics"))
+	}
+
+	http.GetValidator()
+
+	configApp(HttpConfigData{
+		Http:       http,
+		Apm:        params.Apm,
+		Prometheus: params.Prometheus,
+	})
+
+	if opt.Swagger != nil {
+		swOpts := *opt.Swagger
+		title := swOpts.Title
+		if title == "" {
+			title = f.Name
+		}
+		for prefix := range http.routers {
+			p := prefix
+			path := swOpts.Path
+			if path == "" {
+				path = "/swagger"
+			}
+			specPath := p + path + "/openapi.json"
+			http.app.Get(p+path, func(c *fiber.Ctx) error {
+				c.Set("Content-Type", "text/html; charset=utf-8")
+				return c.SendString(swaggerUIHTML(specPath))
+			})
+			http.app.Get(specPath, func(c *fiber.Ctx) error {
+				return c.JSON(http.buildOpenAPISpec(title, f.Version, swOpts.Description, p))
+			})
+		}
+	}
+
+	return http
 }
 
 type Validator struct {
@@ -169,7 +252,9 @@ func (o middlewareOpt) applyRouterOption(_ *Http, _ string, ctx *routerBuildCtx)
 }
 
 type Http struct {
+	name          string
 	port          int
+	started       bool
 	app           *fiber.App
 	routers       map[string]*fiber.Router
 	validator     *Validator
@@ -235,6 +320,7 @@ func (perm Permissions) Can(role, action, subject string) bool {
 }
 
 type HttpOptions struct {
+	Name            string
 	Port            int
 	ConfigApp       func(*fiber.App)
 	LogRequest      bool
@@ -278,6 +364,7 @@ func (h *Http) start(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		h.started = true
 
 		return nil
 
@@ -286,6 +373,11 @@ func (h *Http) start(ctx context.Context) error {
 	}
 }
 func (h *Http) stop(ctx context.Context) error {
+	if !h.started {
+		return nil
+	}
+	h.started = false
+
 	shutdownCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 
@@ -303,6 +395,9 @@ func (h *Http) stop(ctx context.Context) error {
 	}
 }
 
+func (h *Http) GetName() string {
+	return h.name
+}
 func (h *Http) GetApp() *fiber.App {
 	return h.app
 }

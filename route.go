@@ -2,6 +2,7 @@ package fluxgo
 
 import (
 	"context"
+	"fmt"
 
 	"go.uber.org/fx"
 )
@@ -29,6 +30,7 @@ func (d *httpRouteDef) toFxOption(m *FluxModule) fx.Option {
 // HttpDef creates an HTTP route definition that auto-resolves handler *T from DI.
 // T is the concrete handler type; PT is the pointer type that implements HttpHandlers.
 // If CacheTTL is set and Cache is nil, Redis is auto-injected as the cache.
+// The route is registered on the server named by config.Server (default server when empty).
 //
 // Usage: HttpDef[MyHandler](group, method, path, config)
 func HttpDef[T any, PT interface {
@@ -41,17 +43,34 @@ func HttpDef[T any, PT interface {
 		group: group, method: method, path: path, config: config,
 		makeFn: func(m *FluxModule) interface{} {
 			if needsCache {
-				return func(f *FluxGo, http *Http, apm *Apm, redis *Redis, handler PT) error {
+				return func(f *FluxGo, registry *HttpRegistry, apm *Apm, redis *Redis, handler PT) error {
+					http, err := resolveHttp(registry, config.Server)
+					if err != nil {
+						return err
+					}
 					cfg := config
 					cfg.Cache = redis
 					return m.HttpRoute(f, http, apm, group, method, path, cfg, handler.HandleHttp)
 				}
 			}
-			return func(f *FluxGo, http *Http, apm *Apm, handler PT) error {
+			return func(f *FluxGo, registry *HttpRegistry, apm *Apm, handler PT) error {
+				http, err := resolveHttp(registry, config.Server)
+				if err != nil {
+					return err
+				}
 				return m.HttpRoute(f, http, apm, group, method, path, config, handler.HandleHttp)
 			}
 		},
 	}
+}
+
+func resolveHttp(registry *HttpRegistry, name string) (*Http, error) {
+	http := registry.Get(name)
+	if http == nil {
+		return nil, fmt.Errorf("http server %q not registered", name)
+	}
+
+	return http, nil
 }
 
 // GET creates an HTTP GET route definition.
@@ -172,13 +191,24 @@ func (d *grpcRouteDef) toFxOption(m *FluxModule) fx.Option {
 // T must implement GrpcHandlerInterface; PT is the pointer type resolved from DI.
 // RegisterGrpc is called once during startup — it should call the proto-generated
 // RegisterXxxServer(server, handler) function.
+// Pass a server name to target a specific server registered via AddGrpc; omit it
+// to use the default one.
 func GrpcDef[T any, PT interface {
 	*T
 	GrpcHandlerInterface
-}]() RouteDefinition {
+}](server ...string) RouteDefinition {
+	name := ""
+	if len(server) > 0 {
+		name = server[0]
+	}
+
 	return &grpcRouteDef{
 		makeFn: func(m *FluxModule) interface{} {
-			return func(g *Grpc, handler PT) error {
+			return func(registry *GrpcRegistry, handler PT) error {
+				g := registry.Get(name)
+				if g == nil {
+					return fmt.Errorf("grpc server %q not registered", name)
+				}
 				return m.GrpcRoute(g, handler)
 			}
 		},

@@ -99,6 +99,9 @@ type RouteDoc struct {
 }
 
 type RouteIncome struct {
+	// Server selects which HTTP server registered via AddHttp serves this route.
+	// Leave empty for the default server.
+	Server          string
 	Entity          EntityData
 	FromBody        bool
 	FromHeader      bool
@@ -291,6 +294,10 @@ func (i *RouteIncome) cacheKey(c *fiber.Ctx, serviceName string) string {
 	return i.cacheVal(serviceName, c.OriginalURL())
 }
 func (i *RouteIncome) cacheVal(serviceName, val string) string {
+	if i.Server != "" {
+		return fmt.Sprintf("%s:%s:endpoint:%s", serviceName, i.Server, val)
+	}
+
 	return fmt.Sprintf("%s:endpoint:%s", serviceName, val)
 }
 func (i *RouteIncome) cache(ctx context.Context, f *FluxGo, apm *Apm, cache RouteIncome, key string) *string {

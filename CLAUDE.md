@@ -243,6 +243,45 @@ flux.AddModule(user.Module())
 flux.Run() // blocking
 ```
 
+## Multiple HTTP/gRPC Servers
+
+`AddHttp` and `AddGrpc` can be called more than once — each call registers one server on its own port. Name them with `Name`; the first registered is the default.
+
+```go
+flux.AddHttp(fluxgo.HttpOptions{Port: 3333}, func(d fluxgo.HttpConfigData) {
+    d.CreateRouter("/public")
+})
+flux.AddHttp(fluxgo.HttpOptions{Name: "admin", Port: 3334}, func(d fluxgo.HttpConfigData) {
+    d.CreateRouter("/admin")
+})
+flux.AddGrpc(fluxgo.GrpcOptions{Port: 50051})
+flux.AddGrpc(fluxgo.GrpcOptions{Name: "internal", Port: 50052})
+```
+
+Pick the server per route:
+
+```go
+fluxgo.GET[handlers.HandlerGetUser]("/public", "/user/:id", fluxgo.RouteIncome{})                  // default server
+fluxgo.GET[handlers.HandlerAdminStats]("/admin", "/stats", fluxgo.RouteIncome{Server: "admin"})
+fluxgo.GrpcDef[handlers.HandlerUserGrpc]()                                                          // default server
+fluxgo.GrpcDef[handlers.HandlerInternalGrpc]("internal")
+```
+
+Injection:
+
+- `*Http` / `*Grpc` always resolve to the default server (existing code keeps working).
+- `*HttpRegistry` / `*GrpcRegistry` expose `Get(name)`, `Default()` and `All()`.
+- Duplicate names or ports fail at container build with an explicit error.
+- Cache keys include the server name for non-default servers, so same paths on different servers never collide.
+
+In tests:
+
+```go
+fxApp, http := module.Module().GetTestApp(t)                 // default server
+fxApp, admin := module.Module().GetTestAppNamed(t, "admin")  // named server
+fxApp, reg := fluxgo.GetTestRegistry[fluxgo.HttpRegistry](module.Module(), t) // every server
+```
+
 ## RouteIncome Options
 
 | Field | Type | Description |
@@ -256,6 +295,7 @@ flux.Run() // blocking
 | `Cache` | `ICache` | Cache implementation (usually Redis) |
 | `CacheTTL` | `time.Duration` | Cache TTL |
 | `CacheInvalidate` | `[]string` | Route prefixes to invalidate on this request |
+| `Server` | `string` | HTTP server to register the route on (empty = default) |
 
 ## Response Types
 

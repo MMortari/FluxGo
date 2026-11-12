@@ -20,6 +20,8 @@ type Prometheus struct {
 	counterVec   map[string]*prometheus.CounterVec
 	histogramVec map[string]*prometheus.HistogramVec
 	gaugeVec     map[string]*prometheus.GaugeVec
+
+	fiberMetrics *fiberprometheus.FiberPrometheus
 }
 
 func (f *FluxGo) AddPrometheus() *Prometheus {
@@ -33,9 +35,15 @@ func (f *FluxGo) AddPrometheus() *Prometheus {
 	}
 
 	prom := Prometheus{
-		reg, "http", "", f.cleanName, keys,
-		&sync.RWMutex{},
-		make(map[string]*prometheus.CounterVec), make(map[string]*prometheus.HistogramVec), make(map[string]*prometheus.GaugeVec),
+		reg:          reg,
+		namespace:    "http",
+		subsystem:    "",
+		serviceName:  f.cleanName,
+		keys:         keys,
+		mutex:        &sync.RWMutex{},
+		counterVec:   make(map[string]*prometheus.CounterVec),
+		histogramVec: make(map[string]*prometheus.HistogramVec),
+		gaugeVec:     make(map[string]*prometheus.GaugeVec),
 	}
 
 	f.AddDependency(func() *Prometheus { return &prom })
@@ -93,11 +101,20 @@ func (p *Prometheus) NewGaugeVec(opts prometheus.GaugeOpts, labelNames []string)
 	return vec
 }
 
+// Middleware exposes the metrics endpoint on app and returns the collecting middleware.
+// The underlying collectors are created once and shared across every app it is called
+// with, so several HTTP servers can expose the same registry without registering
+// duplicate collectors.
 func (p *Prometheus) Middleware(app *fiber.App, route string) func(*fiber.Ctx) error {
-	prometheus := fiberprometheus.NewWithRegistry(p.reg, p.serviceName, p.namespace, p.subsystem, p.keys)
+	p.mutex.Lock()
+	defer p.mutex.Unlock()
 
-	prometheus.RegisterAt(app, route)
-	prometheus.SetSkipPaths([]string{"/live", "/health", "/readyz"})
+	if p.fiberMetrics == nil {
+		p.fiberMetrics = fiberprometheus.NewWithRegistry(p.reg, p.serviceName, p.namespace, p.subsystem, p.keys)
+		p.fiberMetrics.SetSkipPaths([]string{"/live", "/health", "/readyz"})
+	}
 
-	return prometheus.Middleware
+	p.fiberMetrics.RegisterAt(app, route)
+
+	return p.fiberMetrics.Middleware
 }
