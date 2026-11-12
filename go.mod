@@ -1,6 +1,6 @@
 module github.com/MMortari/FluxGo
 
-go 1.25.0
+go 1.27.0
 
 require (
 	github.com/IBM/sarama v1.46.3
