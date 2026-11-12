@@ -35,6 +35,11 @@ func Module() *fluxgo.FluxModule {
 			}),
 			fluxgo.GET[handlers.HandlerGetUser]("/public", "/user/:id_user", fluxgo.RouteIncome{Entity: dto.GetUserReq{}, CacheTTL: time.Hour}),
 			fluxgo.PUT[handlers.HandlerUpdateUser]("/public", "/user/:id_user", fluxgo.RouteIncome{Entity: dto.UpdateUserReq{}, CacheTTL: time.Hour, Doc: &fluxgo.RouteDoc{Summary: "Atualiza informações do usuário", Description: "Atualiza informações do usuário com base no ID fornecido", OkResponse: dto.UpdateUserRes{}}}),
+			fluxgo.GET[handlers.HandlerListUser]("/admin", "/user", fluxgo.RouteIncome{
+				Server:    "admin",
+				Entity:    dto.ListUserReq{},
+				FromQuery: true,
+			}),
 			fluxgo.POST[handlers.HandlerGetUser]("/internal", "/refresh", fluxgo.RouteIncome{Entity: dto.GetUserReq{}, CacheInvalidate: []string{"/public/user"}}),
 			fluxgo.TopicDef[handlers.HandlerGetUser]("TEST"),
 			fluxgo.ToolDef[handlers.HandlerGetUser](),

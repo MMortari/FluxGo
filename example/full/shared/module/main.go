@@ -60,6 +60,14 @@ func Module() *fluxgo.FluxGo {
 			}),
 		)
 	})
+	flux.AddHttp(fluxgo.HttpOptions{
+		Name:            "admin",
+		Port:            3334,
+		LogRequest:      true,
+		AddHealthRoutes: true,
+	}, func(data fluxgo.HttpConfigData) {
+		data.CreateRouter("/admin")
+	})
 	flux.AddTools()
 	flux.AddGrpc(fluxgo.GrpcOptions{Port: 50051, Reflection: true})
 
